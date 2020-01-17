@@ -8,14 +8,6 @@ use std::path::Path;
 use std::sync::mpsc::channel;
 use std::thread;
 
-fn read_to_string(file: &str) -> Result<String, std::io::Error> {
-    let path = Path::new(file);
-    let mut f = File::open(path)?;
-    let mut c = String::new();
-    f.read_to_string(&mut c)?;
-    Ok(c)
-}
-
 pub fn execute(logger: Logger) {
     // read and parse
     let config_str = match read_to_string("./sonar.yaml") {
@@ -40,6 +32,7 @@ pub fn execute(logger: Logger) {
         match target.report.format {
             ReportFormat::FLAT => match target.report.r#type {
                 ReportType::FILE => {
+                    // TODO extract thread logger
                     thread_number += 1;
                     let logger = logger.clone();
                     threads.push(thread::spawn(move || {
@@ -63,19 +56,20 @@ pub fn execute(logger: Logger) {
             },
         };
 
+        let logger = logger.clone();
         threads.push(thread::spawn(move || {
-            println!(
+            logger.log(format!(
                 "# Started thread {} with target {}\n",
                 thread_number, target.name
-            );
+            ));
 
             match target.r#type {
                 TargetType::HTTP => unimplemented!(),
                 TargetType::HTTPS => loop {
-                    println!(
+                    logger.info(format!(
                         "[{}] Sending {} request to {}",
                         thread_number, target.r#type, target.host
-                    );
+                    ));
                     thread::sleep(target.interval);
                 },
                 TargetType::TCP => unimplemented!(),
@@ -85,8 +79,18 @@ pub fn execute(logger: Logger) {
         }));
     }
 
+    logger.info(format!("# Running with {} threads\n", thread_number));
+
     for thread in threads {
         // wait for all threads to finish
         let _ = thread.join();
     }
+}
+
+fn read_to_string(file: &str) -> Result<String, std::io::Error> {
+    let path = Path::new(file);
+    let mut f = File::open(path)?;
+    let mut c = String::new();
+    f.read_to_string(&mut c)?;
+    Ok(c)
 }
