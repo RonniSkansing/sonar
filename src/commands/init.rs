@@ -1,30 +1,33 @@
-// TODO Rename to init-command.rs
 use super::config::{Report, ReportFormat, ReportType, Target, TargetType};
+use crate::Logger;
+
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
-pub fn execute() {
+pub fn execute(logger: Logger) {
     let targets = vec![
         Target {
             name: String::from("name-example.com"),
             host: String::from("example.com"),
             r#type: TargetType::HTTPS,
-            interval: std::time::Duration::from_secs(5),
+            interval: std::time::Duration::from_secs(1),
             report: Report {
                 r#type: ReportType::FILE,
                 format: ReportFormat::FLAT,
+                location: String::from("./name-example.com"),
             },
         },
         Target {
-            name: String::from("name-example.com"),
-            host: String::from("example.com"),
+            name: String::from("name2-www.example.com"),
+            host: String::from("www.example.com"),
             r#type: TargetType::HTTPS,
-            interval: std::time::Duration::from_secs(5),
+            interval: std::time::Duration::from_secs(3),
             report: Report {
                 r#type: ReportType::FILE,
                 format: ReportFormat::FLAT,
+                location: String::from("./name-example.com"),
             },
         },
     ];
@@ -44,6 +47,8 @@ pub fn execute() {
     };
     match file.write_all(default_config.as_bytes()) {
         Err(why) => panic!("failed to write config {}: {}", display, why.description()),
-        Ok(_) => println!("sample sonar.yaml created. Run 'sonar run' to start"),
+        Ok(_) => logger.info(String::from(
+            "sample sonar.yaml created - Run 'sonar run' to begin monitoring",
+        )),
     }
 }

@@ -1,9 +1,14 @@
 // TODO - Implement a init
 // TODO - Read the project file or bail
 // TODO - Implement proxy via. HTTP_PROXY / HTTPS_PROXY
+// TODO - Implmement verbosity  -vvv
 
-use clap::{App, SubCommand};
 mod commands;
+mod logger;
+mod reports;
+
+use clap::{App, Arg, SubCommand};
+use logger::{LogLevel, Logger};
 
 struct Application<'a> {
     name: &'a str,
@@ -20,9 +25,9 @@ struct SonarCommand<'a> {
 
 impl SonarCommand<'_> {
     fn into_clap(&self) -> App {
-        return SubCommand::with_name(self.name)
+        SubCommand::with_name(self.name)
             .help(self.help)
-            .about(self.about);
+            .about(self.about)
     }
 }
 
@@ -31,6 +36,15 @@ struct SonarArg<'a> {
     short: &'a str,
     takes_value: &'a bool,
     help: &'a str,
+}
+
+impl SonarArg<'_> {
+    fn into_clap(&self) -> Arg {
+        Arg::with_name(self.name)
+            .help(self.help)
+            .short(self.short)
+            .takes_value(*self.takes_value)
+    }
 }
 
 /* TODO : this could be cool ..
@@ -49,6 +63,27 @@ fn main() {
         about: "Portable Surveillance and monitoring",
     };
 
+    let debug_arg = SonarArg {
+        name: "debug",
+        short: "d",
+        takes_value: &false,
+        help: "Add a backtrace (if build with symbols)",
+    };
+
+    let verbose_arg = SonarArg {
+        name: "verbose",
+        short: "v",
+        takes_value: &false,
+        help: "Verbose",
+    };
+
+    let quiet_arg = SonarArg {
+        name: "quiet",
+        short: "q",
+        takes_value: &false,
+        help: "Quiet",
+    };
+
     let init_command = SonarCommand {
         name: "init",
         about: "Inits a new project in the current directory",
@@ -61,20 +96,37 @@ fn main() {
         help: "runs the project",
     };
 
-    let mut app = App::new(sonar.name)
+    let app = App::new(sonar.name)
+        .arg(debug_arg.into_clap())
+        .arg(verbose_arg.into_clap())
         .version(sonar.version)
         .author(sonar.author)
         .about(sonar.about)
         .subcommand(init_command.into_clap())
         .subcommand(run_command.into_clap());
 
-    // TODO - can I avoid the clone?
-    match app.clone().get_matches().subcommand() {
-        (name, Some(_)) if name == init_command.name => {
-            commands::init::execute();
-            // init(); // TODO : this put it into a endless loop
-            // println!("called {} {:?}", name);
+    let matches = app.get_matches();
+
+    // config debug
+    if matches.is_present(debug_arg.name) {
+        std::env::set_var("RUST_BACKTRACE", "1");
+    }
+
+    // setup logger
+    let mut log_level = LogLevel::NORMAL;
+    if matches.is_present(quiet_arg.name) {
+        log_level = LogLevel::NONE;
+    } else {
+        if let Some(log_level_str) = matches.value_of(verbose_arg.name) {
+            log_level = LogLevel::from_string(log_level_str);
         }
+    }
+    let logger = Logger::new(log_level);
+
+    // run command
+    match matches.subcommand() {
+        (name, Some(_)) if name == init_command.name => commands::init::execute(logger),
+        (name, Some(_)) if name == run_command.name => commands::run::execute(logger),
         (_, Some(_)) => (),
         (&_, None) => (),
     }
