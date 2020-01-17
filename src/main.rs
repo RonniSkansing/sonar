@@ -1,201 +1,237 @@
-// TODO - Implement a init
-// TODO - Read the project file or bail
-// TODO - Implement proxy via. HTTP_PROXY / HTTPS_PROXY
+//!### Internal Event Flow
+//!
+//!- Sonar started
+//!
+//!  - Event: Config created/changed/deleted
+//!    - Job: Create new grafana dashboard
+//!      - 3.Party: Grafana reads new dashboard
+//!    - Job: Change Grafana Metrics exporter
+//!    - Job: Stop / Start / Change Requesters
+//!
+//!- Event: Requester completed/failed request
+//!  - Job: Logger writes to log file
+//!  - Job: Grafana metrics added to exporter client
+mod cli;
+mod command;
+mod config;
+mod messages;
+mod server;
+mod tasks;
+mod utils;
 
-use clap::{App, SubCommand};
-mod commands;
+use clap::{App, Arg, ArgMatches, Shell, SubCommand};
+use log::*;
+use reqwest::Client;
+use simplelog::*;
+use std::path::PathBuf;
+use tokio::runtime;
 
-struct Application<'a> {
-    name: &'a str,
-    author: &'a str,
-    version: &'a str,
-    about: &'a str,
-}
-
-struct SonarCommand<'a> {
-    name: &'a str,
-    about: &'a str,
-    help: &'a str,
-}
-
-impl SonarCommand<'_> {
-    fn into_clap(&self) -> App {
-        return SubCommand::with_name(self.name)
-            .help(self.help)
-            .about(self.about);
-    }
-}
-
-struct SonarArg<'a> {
-    name: &'a str,
-    short: &'a str,
-    takes_value: &'a bool,
-    help: &'a str,
-}
-
-/* TODO : this could be cool ..
-impl Into<SubCommand> for SonarCommand {
-    fn into(&self) -> SubCommand {
-
-    }
-}
-*/
+const DEFAULT_CONFIG_PATH: &str = "./sonar.yaml";
 
 fn main() {
-    let sonar = Application {
-        name: "Sonar",
-        author: "",
-        version: "0.0.0",
-        about: "Portable Surveillance and monitoring",
-    };
+    let mut app = create_cli();
+    let matches = app.clone().get_matches();
 
-    let init_command = SonarCommand {
-        name: "init",
-        about: "Inits a new project in the current directory",
-        help: "Inits a new project in the current directory",
-    };
+    setup_backtrace_if_debug(&matches);
+    setup_logger(&matches);
+    setup_panic_handler();
 
-    let run_command = SonarCommand {
-        name: "run",
-        about: "runs the project",
-        help: "runs the project",
-    };
+    let mut runtime_builder = runtime::Builder::new();
+    match matches.subcommand() {
+        (name, Some(matches)) if name == command::init::NAME => {
+            let from_file = match matches.args.get(command::run::NAME) {
+                Some(args) => Some(PathBuf::from(
+                    args.vals[0]
+                        .clone()
+                        .into_string()
+                        .expect("failed to get path to file with domain names"),
+                )),
+                None => None,
+            };
+            let size = matches
+                .args
+                .get(command::init::MAXIMUM_ARG_NAME)
+                .map(|_| command::init::Size::Maximal)
+                .unwrap_or(command::init::Size::Minimal);
+            let overwrite = matches
+                .args
+                .get(command::init::OVERWRITE_ARG_NAME)
+                .map(|_| true)
+                .unwrap_or(false);
 
-    let mut app = App::new(sonar.name)
-        .version(sonar.version)
-        .author(sonar.author)
-        .about(sonar.about)
-        .subcommand(init_command.into_clap())
-        .subcommand(run_command.into_clap());
+            let mut rt = runtime_builder.build().expect("failed to create runtime");
 
-    // TODO - can I avoid the clone?
-    match app.clone().get_matches().subcommand() {
-        (name, Some(_)) if name == init_command.name => {
-            commands::init::execute();
-            // init(); // TODO : this put it into a endless loop
-            // println!("called {} {:?}", name);
-        }
-        (_, Some(_)) => (),
-        (&_, None) => (),
-    }
-}
-
-/* use clap::{App, Arg, SubCommand};
-use reqwest::{StatusCode};
-use chrono::{Utc, SecondsFormat};
-
-const SINGLE_TARGET_COMMAND: &str = "single-target";
-const SINGLE_TARGET_ARG_DOMAIN: &str = "domain";
-const SINGLE_TARGET_ARG_DELAY: &str = "delay";
-
-const SINGLE_TARGET_ARG_DELAY_DEFAULT: &str = "1000";
-
-struct MyArg<'a> {
-    name: &'a str,
-    short: &'a str,
-    takes_value: bool,
-    help: &'a str // The last field in a struct can have a dynamic size (wtf) try removing the &'a
-}
-
-trait Command<'a> {
-    const NAME: &'a str;
-    const ABOUT: &'a str;
-
-    fn args() -> Vec<MyArg<'a>>;
-}
-
-struct SingleRequestcommand {}
-impl<'a> Command<'a> for SingleRequestcommand {
-    const NAME: &'static str = "single-request";
-    const ABOUT: &'static str = "fire a single request";
-
-    fn args() -> Vec<MyArg<'a>> {
-        vec!(
-            MyArg{
-                name: SINGLE_TARGET_ARG_DOMAIN,
-                short: "d",
-                takes_value: true,
-                help: "the domain to ping agaist"
-            },
-            MyArg{
-                name: SINGLE_TARGET_ARG_DOMAIN,
-                short: "t",
-                takes_value: true,
-                help: "the repeat request delay in ms"
-            }
-        )
-    }
-}
-
-// TODO Implement verbosity flag
-// TODO Implement latency
-
-fn main() {
-    //let single_target_arg_delay_help: &str = &format!("the repeat request delay in ms default to {}", SINGLE_TARGET_ARG_DELAY_DEFAULT);
-
-    let app = App::new("Sonar")
-        .version("0.1")
-        .author("--")
-        .about("")
-    ;
-
-    [SingleRequestcommand{}].iter().for_each(|c| {
-        SubCommand.with_name()
-    });
-
-        /*
-        .subcommand(
-            SubCommand::with_name(SINGLE_TARGET_COMMAND)
-                .about("starts requesting against a single target")
-                .arg(
-                    Arg::with_name(SINGLE_TARGET_ARG_DOMAIN)
-                        .short("d")
-                        .takes_value(true)
-                        .help("the domain to ping agaist"),
-                )
-                .arg(
-                    Arg::with_name(SINGLE_TARGET_ARG_DELAY)
-                        .short("t")
-                        .takes_value(true)
-                        .help(single_target_arg_delay_help)
-                )
-        );
-        */
-
-    match app.get_matches().subcommand() {
-        (SINGLE_TARGET_COMMAND, Some(args)) => {
-            single_target(args);
-        }
-        // TODO - What does this cover?
-        (_, Some(_)) => panic!("Some ?"),
-        // TODO - What is the meaning of &_ ?
-        (&_, None) => panic!("None ? "),
-    }
-}
-
-fn single_target(args: &clap::ArgMatches) {
-    let target = match args.value_of(SINGLE_TARGET_ARG_DOMAIN) {
-        Some(v) => v,
-        None => panic!("Missing domain argument. Supply with -d or --domain")
-    };
-    let timeout: u32 = args.value_of(SINGLE_TARGET_ARG_DELAY).unwrap_or(SINGLE_TARGET_ARG_DELAY_DEFAULT).parse().unwrap_or_default();
-    // TODO - Validate targ(et
-
-    loop {
-        match reqwest::get(target) {
-            Ok(mut res) => {
-                match res.status() {
-                    StatusCode::OK => {
-                        println!("{} 200 {}", Utc::now().to_rfc3339_opts(SecondsFormat::Millis, false), target);
+            rt.block_on(
+                command::init::Command {
+                    config: command::init::Config {
+                        overwrite,
+                        size,
+                        from_file,
                     },
-                    _ => {
-                        println!("Not ok status code");
-                    }
                 }
-            },
-            Err(err) => println!("FAILED: {}", err)
+                .execute(),
+            );
         }
-        std::thread::sleep_ms(timeout)
+        (name, Some(matches)) if name == command::run::NAME => {
+            // setup runtime
+            let threads_arg_match = matches.args.get(command::run::THREAD_ARG_NAME);
+            if threads_arg_match.is_some() {
+                let v = threads_arg_match.unwrap();
+                let n: usize = v.vals[0]
+                    .clone()
+                    .into_string()
+                    .expect("failed to take osstring into string")
+                    .parse()
+                    .expect("failed to parse thread number to usize");
+                runtime_builder.max_threads(n);
+
+                debug!("Thread pool set to {}", n);
+            }
+            let config_path = match matches.args.get(command::run::CONFIG_ARG_NAME) {
+                Some(arg) => PathBuf::from(
+                    arg.vals[0]
+                        .clone()
+                        .into_string()
+                        .expect("failed to get config path"),
+                ),
+                None => DEFAULT_CONFIG_PATH.into(),
+            };
+            runtime_builder
+                .threaded_scheduler()
+                .thread_name(cli::APP_NAME)
+                .enable_all()
+                .build()
+                .expect("failed to create runtime")
+                .block_on(command::run::Command::exercute(config_path, Client::new()))
+                .expect("failed run 'run' command");
+        }
+        (command::autocomplete::NAME, Some(sub_matches)) => {
+            let shell: Shell = sub_matches
+                .value_of(command::autocomplete::SHELL_ARG_NAME)
+                .expect("unable to get shell name")
+                .parse()
+                .expect("unable to parse SHELL");
+            command::autocomplete::Command::execute(app, shell);
+        }
+        (_, _) => {
+            app.print_long_help()
+                .expect("failed to print error message. Sorry.");
+            println!("");
+        }
     }
 }
- */
+
+fn create_cli<'a, 'b>() -> App<'a, 'b> {
+    App::new(cli::APP_NAME)
+        .arg(
+            Arg::with_name(cli::DEBUG_ARG_NAME)
+                .help(cli::DEBUG_ARG_HELP)
+                .short(cli::DEBUG_ARG_SHORT)
+                .long(cli::DEBUG_ARG_LONG)
+                .takes_value(cli::DEBUG_ARG_TAKES_VALUE),
+        )
+        .arg(
+            Arg::with_name(cli::QUIET_ARG_NAME)
+                .help(cli::QUIET_ARG_HELP)
+                .short(cli::QUIET_ARG_SHORT)
+                .long(cli::QUIET_ARG_LONG)
+                .takes_value(cli::QUIET_ARG_TAKES_VALUE),
+        )
+        .version(cli::APP_VERSION)
+        .author(cli::APP_AUTHOR)
+        .about(cli::APP_ABOUT)
+        .subcommand(
+            SubCommand::with_name(command::init::NAME)
+                .about(command::init::ABOUT)
+                .arg(
+                    Arg::with_name(command::init::MAXIMUM_ARG_NAME)
+                        .help(command::init::MAXIMUM_ARG_HELP)
+                        .short(command::init::MAXIMUM_ARG_SHORT)
+                        .long(command::init::MAXIMUM_ARG_LONG)
+                        .takes_value(command::init::MAXIMUM_ARG_TAKES_VALUE),
+                )
+                .arg(
+                    Arg::with_name(command::init::FROM_ARG_NAME)
+                        .help(command::init::FROM_ARG_HELP)
+                        .short(command::init::FROM_ARG_SHORT)
+                        .long(command::init::FROM_ARG_LONG)
+                        .takes_value(command::init::FROM_ARG_TAKES_VALUE),
+                )
+                .arg(
+                    Arg::with_name(command::init::OVERWRITE_ARG_NAME)
+                        .help(command::init::OVERWRITE_ARG_HELP)
+                        .short(command::init::OVERWRITE_ARG_SHORT)
+                        .long(command::init::OVERWRITE_ARG_LONG)
+                        .takes_value(command::init::OVERWRITE_ARG_TAKES_VALUE),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name(command::run::NAME)
+                .about(command::run::ABOUT)
+                .arg(
+                    Arg::with_name(command::run::CONFIG_ARG_NAME)
+                        .help(command::run::CONFIG_ARG_HELP)
+                        .short(command::run::CONFIG_ARG_SHORT)
+                        .long(command::run::CONFIG_ARG_LONG)
+                        .takes_value(command::run::CONFIG_ARG_TAKES_VALUE),
+                )
+                .arg(
+                    Arg::with_name(command::run::THREAD_ARG_NAME)
+                        .help(command::run::THREAD_ARG_HELP)
+                        .short(command::run::THREAD_ARG_SHORT)
+                        .long(command::run::THREAD_ARG_LONG)
+                        .takes_value(command::run::THREAD_ARG_TAKES_VALUE),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name(command::autocomplete::NAME)
+                .about(command::autocomplete::ABOUT)
+                .arg(
+                    Arg::with_name(command::autocomplete::SHELL_ARG_NAME)
+                        .short(command::autocomplete::SHELL_ARG_SHORT)
+                        .long(command::autocomplete::SHELL_ARG_LONG)
+                        .required(command::autocomplete::SHELL_ARG_REQUIRED)
+                        .possible_values(&command::autocomplete::SHELL_POSSIBLE_VALUES)
+                        .help(command::autocomplete::SHELL_ARG_HELP),
+                ),
+        )
+}
+
+fn setup_backtrace_if_debug(matches: &ArgMatches) {
+    if matches.is_present(cli::DEBUG_ARG_NAME) {
+        std::env::set_var("RUST_BACKTRACE", "full");
+    }
+}
+
+fn setup_logger(matches: &ArgMatches) {
+    let mut loggers: Vec<Box<dyn SharedLogger>> = vec![];
+    let config = ConfigBuilder::new()
+        .add_filter_ignore_str("mio")
+        .add_filter_ignore_str("hyper")
+        .add_filter_ignore_str("reqwest")
+        .add_filter_ignore_str("want")
+        .build();
+    if !matches.is_present(cli::QUIET_ARG_NAME) {
+        let filter: LevelFilter = if matches.is_present(cli::DEBUG_ARG_NAME) {
+            LevelFilter::Trace
+        } else {
+            LevelFilter::Info
+        };
+
+        match TermLogger::new(filter, config.clone(), TerminalMode::Mixed) {
+            Some(logger) => loggers.push(logger),
+            None => loggers.push(SimpleLogger::new(filter, config.clone())),
+        }
+    }
+
+    let _ = CombinedLogger::init(loggers).expect("failed to setup logger");
+}
+
+fn setup_panic_handler() {
+    let hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |p| {
+        hook(p);
+        error!("a thread panicked - shutting down");
+        std::process::exit(1);
+    }));
+}
