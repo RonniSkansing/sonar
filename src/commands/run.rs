@@ -82,7 +82,6 @@ pub fn execute(logger: Logger) {
     logger.info(format!("# Running with {} threads\n", thread_number));
 
     for thread in threads {
-        // wait for all threads to finish
         let _ = thread.join();
     }
 }
