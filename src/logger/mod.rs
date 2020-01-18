@@ -5,6 +5,7 @@ pub enum LogLevel {
     VERBOSE,
 }
 
+/*
 impl LogLevel {
     pub fn from_string(s: &str) -> LogLevel {
         match s {
@@ -15,6 +16,7 @@ impl LogLevel {
         }
     }
 }
+*/
 
 #[derive(Debug, Clone)]
 pub struct Logger {
@@ -36,6 +38,7 @@ impl Logger {
     }
     */
 
+    // TODO Implement something ala log<S: AsRef<String> .. Into<String>..
     pub fn log(&self, message: String) {
         match self.level {
             LogLevel::NONE => (),

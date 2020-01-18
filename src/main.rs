@@ -1,11 +1,9 @@
-// TODO - Implement a init
-// TODO - Read the project file or bail
-// TODO - Implement proxy via. HTTP_PROXY / HTTPS_PROXY
-// TODO - Implmement verbosity  -vvv
-
 mod commands;
 mod logger;
+mod messages;
 mod reports;
+mod requesters;
+mod utils;
 
 use clap::{App, Arg, SubCommand};
 use logger::{LogLevel, Logger};
@@ -116,10 +114,8 @@ fn main() {
     let mut log_level = LogLevel::NORMAL;
     if matches.is_present(quiet_arg.name) {
         log_level = LogLevel::NONE;
-    } else {
-        if let Some(log_level_str) = matches.value_of(verbose_arg.name) {
-            log_level = LogLevel::from_string(log_level_str);
-        }
+    } else if matches.is_present(verbose_arg.name) {
+        log_level = LogLevel::VERBOSE;
     }
     let logger = Logger::new(log_level);
 

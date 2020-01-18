@@ -1,5 +1,6 @@
 use super::config::{ReportFormat, ReportType, Target, TargetType};
 use crate::reports::file::FileReporter;
+use crate::requesters::http::HttpRequester;
 use crate::Logger;
 use std::error::Error;
 use std::fs::File;
@@ -24,24 +25,25 @@ pub fn execute(logger: Logger) {
     let mut threads = vec![];
     let mut thread_number = 0;
 
-    // handle target requesting
     for target in config {
-        let (_, recv) = channel();
+        let (sender, recv) = channel();
         let reporter_location = target.report.location.clone();
 
         match target.report.format {
             ReportFormat::FLAT => match target.report.r#type {
                 ReportType::FILE => {
+                    // reporter
                     // TODO extract thread logger
                     thread_number += 1;
                     let logger = logger.clone();
                     threads.push(thread::spawn(move || {
                         logger.info(format!(
-                            "Starting flat file report handler at {}",
-                            reporter_location
+                            "Thread [{}] Starting flat file report handler at {}",
+                            thread_number, reporter_location
                         ));
-                        // TODO Improve error handling if FileReporter can not be constructed
-                        FileReporter::new(reporter_location, recv).unwrap();
+                        FileReporter::new(reporter_location, recv, logger)
+                            .expect("failed to create file reporter")
+                            .listen();
                     }));
                 }
                 ReportType::HTTP => unimplemented!(),
@@ -57,26 +59,27 @@ pub fn execute(logger: Logger) {
         };
 
         let logger = logger.clone();
-        threads.push(thread::spawn(move || {
-            logger.log(format!(
-                "# Started thread {} with target {}\n",
-                thread_number, target.name
-            ));
-
-            match target.r#type {
-                TargetType::HTTP => unimplemented!(),
-                TargetType::HTTPS => loop {
+        let name = target.name.clone();
+        let host = target.host.clone();
+        let interval = target.interval.clone();
+        match target.r#type {
+            TargetType::HTTP => {
+                // requester
+                thread_number += 1;
+                let logger = logger.clone();
+                threads.push(thread::spawn(move || {
                     logger.info(format!(
-                        "[{}] Sending {} request to {}",
-                        thread_number, target.r#type, target.host
+                        "Thread [{}] Starting http requester for {} {}",
+                        thread_number, name, host
                     ));
-                    thread::sleep(target.interval);
-                },
-                TargetType::TCP => unimplemented!(),
-                TargetType::UDP => unimplemented!(),
-                TargetType::IMCP => unimplemented!(),
+                    HttpRequester::new(host, interval, sender, logger).run();
+                }));
             }
-        }));
+            TargetType::HTTPS => unimplemented!(),
+            TargetType::TCP => unimplemented!(),
+            TargetType::UDP => unimplemented!(),
+            TargetType::IMCP => unimplemented!(),
+        }
     }
 
     logger.info(format!("# Running with {} threads\n", thread_number));
