@@ -25,8 +25,10 @@ impl FileReporter {
             .parent()
             .expect("failed to parent folder of log file");
 
-        if !path.is_dir() {
-            std::fs::create_dir_all(path).expect("failed to create path to log file");
+        match std::fs::create_dir(path) {
+            Ok(_) => (),
+            Err(ref e) if e.kind() == std::io::ErrorKind::AlreadyExists => (),
+            Err(e) => panic!(e),
         }
         let file = File::create_append(file_path).expect("failed to create or open in write mode");
 
