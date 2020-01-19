@@ -28,17 +28,15 @@ impl Logger {
         Logger { level: level }
     }
 
-    /*
-    pub fn error(&self, message: &String) {
+    // TODO Implement something ala log<S: AsRef<String> .. Into<String>..
+    pub fn error(&self, message: String) {
         match self.level {
             LogLevel::NONE => (),
-            LogLevel::NORMAL => println!("{}", message),
-            LogLevel::VERBOSE => println!("{}", message),
+            LogLevel::NORMAL => eprintln!("Error {}", message),
+            LogLevel::VERBOSE => eprintln!("Error {}", message),
         }
     }
-    */
 
-    // TODO Implement something ala log<S: AsRef<String> .. Into<String>..
     pub fn log(&self, message: String) {
         match self.level {
             LogLevel::NONE => (),
@@ -51,7 +49,7 @@ impl Logger {
         match self.level {
             LogLevel::NONE => (),
             LogLevel::NORMAL => (),
-            LogLevel::VERBOSE => println!("{}", message),
+            LogLevel::VERBOSE => println!("INFO {}", message),
         }
     }
 }

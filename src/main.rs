@@ -1,7 +1,7 @@
 mod commands;
 mod logger;
 mod messages;
-mod reports;
+mod reporters;
 mod requesters;
 mod utils;
 

@@ -1,5 +1,5 @@
 use super::config::{ReportFormat, ReportType, Target, TargetType};
-use crate::reports::file::FileReporter;
+use crate::reporters::file::FileReporter;
 use crate::requesters::http::HttpRequester;
 use crate::Logger;
 use std::error::Error;
@@ -8,7 +8,6 @@ use std::io::prelude::*;
 use std::path::Path;
 use std::sync::mpsc::channel;
 use std::thread;
-
 pub fn execute(logger: Logger) {
     // read and parse
     let config_str = match read_to_string("./sonar.yaml") {
@@ -33,7 +32,6 @@ pub fn execute(logger: Logger) {
             ReportFormat::FLAT => match target.report.r#type {
                 ReportType::FILE => {
                     // reporter
-                    // TODO extract thread logger
                     thread_number += 1;
                     let logger = logger.clone();
                     threads.push(thread::spawn(move || {
