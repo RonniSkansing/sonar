@@ -11,7 +11,7 @@ pub fn execute(logger: Logger) {
         Target {
             name: String::from("name-example.com"),
             host: String::from("example.com"),
-            r#type: TargetType::HTTPS,
+            r#type: TargetType::HTTP,
             interval: std::time::Duration::from_secs(1),
             report: Report {
                 r#type: ReportType::FILE,
@@ -22,8 +22,8 @@ pub fn execute(logger: Logger) {
         Target {
             name: String::from("name2-www.example.com"),
             host: String::from("www.example.com"),
-            r#type: TargetType::HTTPS,
-            interval: std::time::Duration::from_secs(3),
+            r#type: TargetType::HTTP,
+            interval: std::time::Duration::from_secs(1),
             report: Report {
                 r#type: ReportType::FILE,
                 format: ReportFormat::FLAT,

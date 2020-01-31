@@ -13,3 +13,4 @@ serde = { version = "1.0.104", features = ["derive"]}
 strum = "0.17.1"
 strum_macros = "0.17.1"
 chrono = "0.4.10"
+tokio = { version = "0.2.11", features = ["full"] }

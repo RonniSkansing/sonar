@@ -7,8 +7,10 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use std::sync::mpsc::channel;
-use std::thread;
-pub fn execute(logger: Logger) {
+use tokio::spawn;
+use tokio::task::JoinHandle;
+
+pub async fn execute(logger: Logger) {
     // read and parse
     let config_str = match read_to_string("./sonar.yaml") {
         // TODO Reconsider the use of panic for missing file
@@ -21,9 +23,7 @@ pub fn execute(logger: Logger) {
         Ok(conf) => conf,
     };
 
-    let mut threads = vec![];
-    let mut thread_number = 0;
-
+    let mut tasks: Vec<JoinHandle<_>> = vec![];
     for target in config {
         let (sender, recv) = channel();
         let reporter_location = target.report.location.clone();
@@ -32,45 +32,41 @@ pub fn execute(logger: Logger) {
             ReportFormat::FLAT => match target.report.r#type {
                 ReportType::FILE => {
                     // reporter
-                    thread_number += 1;
                     let logger = logger.clone();
-                    threads.push(thread::spawn(move || {
-                        logger.info(format!(
-                            "Thread [{}] Starting flat file report handler at {}",
-                            thread_number, reporter_location
-                        ));
+                    tasks.push(spawn(async move {
+                        logger.info(format!("Starting flat file reporter {}", reporter_location));
                         FileReporter::new(reporter_location, recv, logger)
-                            .expect("failed to create file reporter")
+                            .expect("failed to create flat file reporter")
                             .listen();
                     }));
                 }
                 ReportType::HTTP => unimplemented!(),
                 ReportType::HTTPS => unimplemented!(),
-                // _ => panic!("Unknown report type: {}", &r.r#type),
             },
             ReportFormat::JSON => match target.report.r#type {
                 ReportType::FILE => unimplemented!(),
                 ReportType::HTTP => unimplemented!(),
                 ReportType::HTTPS => unimplemented!(),
-                // _ => panic!("Unknown report type: {}", &r.r#type),
             },
         };
 
-        let logger = logger.clone();
-        let name = target.name.clone();
-        let host = target.host.clone();
-        let interval = target.interval.clone();
         match target.r#type {
             TargetType::HTTP => {
-                // requester
-                thread_number += 1;
+                // TODO implement max concurrent requests and timeout limit
+                logger.info(format!(
+                    "Starting HTTP requester for {} {}",
+                    target.name, target.host
+                ));
                 let logger = logger.clone();
-                threads.push(thread::spawn(move || {
-                    logger.info(format!(
-                        "Thread [{}] Starting http requester for {} {}",
-                        thread_number, name, host
-                    ));
-                    HttpRequester::new(host, interval, sender, logger).run();
+                tasks.push(spawn(async move {
+                    loop {
+                        let sender = sender.clone();
+                        let host = target.host.clone();
+                        let interval = target.interval.clone();
+                        let logger = logger.clone();
+                        HttpRequester::new(host, sender, logger).run();
+                        tokio::time::delay_for(interval).await;
+                    }
                 }));
             }
             TargetType::HTTPS => unimplemented!(),
@@ -80,10 +76,8 @@ pub fn execute(logger: Logger) {
         }
     }
 
-    logger.info(format!("# Running with {} threads\n", thread_number));
-
-    for thread in threads {
-        let _ = thread.join();
+    for t in tasks {
+        t.await.expect("failed to listen to task to completion");
     }
 }
 

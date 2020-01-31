@@ -46,7 +46,6 @@ impl FileReporter {
                     let entry = Entry::from_dto(dto);
                     let line = format!("{} {}\n", entry.time.timestamp(), entry.response_code);
 
-                    // TODO extract as trait and implement with macro for all reporters
                     self.logger.info(format!("HTTP Reporter - {}", line));
 
                     match self.file.write(line.as_bytes()) {
