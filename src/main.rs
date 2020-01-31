@@ -103,6 +103,9 @@ fn main() {
         .subcommand(init_command.into_clap())
         .subcommand(run_command.into_clap());
 
+    // can I avoid a clone here?
+    let mut app_help = app.clone();
+
     let matches = app.get_matches();
 
     // config debug
@@ -123,8 +126,12 @@ fn main() {
     match matches.subcommand() {
         (name, Some(_)) if name == init_command.name => commands::init::execute(logger),
         (name, Some(_)) if name == run_command.name => commands::run::execute(logger),
-        (_, Some(_)) => (),
-        (&_, None) => (),
+        (_, _) => {
+            app_help
+                .print_long_help()
+                .expect("Failed to print error message. Sorry.");
+            println!("");
+        }
     }
 }
 
