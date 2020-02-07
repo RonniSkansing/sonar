@@ -2,6 +2,7 @@ use super::config::{ReportFormat, ReportType, Target, TargetType};
 use crate::reporters::file::FileReporter;
 use crate::requesters::http::HttpRequester;
 use crate::Logger;
+use reqwest::Client;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
@@ -10,7 +11,7 @@ use std::sync::mpsc::channel;
 use tokio::spawn;
 use tokio::task::JoinHandle;
 
-pub async fn execute(logger: Logger) {
+pub async fn execute<'a>(logger: Logger, client: &Client) {
     // read and parse
     let config_str = match read_to_string("./sonar.yaml") {
         // TODO Reconsider the use of panic for missing file
@@ -57,15 +58,20 @@ pub async fn execute(logger: Logger) {
                     "Starting HTTP requester for {} {}",
                     target.name, target.host
                 ));
-                let logger = logger.clone();
+                // let client = client.clone();
+                let requester = HttpRequester::new(&client /*, &sender, logger.clone()*/);
                 tasks.push(spawn(async move {
+                    requester.run(/*target.host.clone()*/);
                     loop {
+                        /*
                         let sender = sender.clone();
                         let host = target.host.clone();
                         let interval = target.interval.clone();
                         let logger = logger.clone();
-                        HttpRequester::new(host, sender, logger).run();
-                        tokio::time::delay_for(interval).await;
+                        let host = host.clone();
+                        let client = client.clone();
+                        */
+                        // tokio::time::delay_for(target.interval).await;
                     }
                 }));
             }

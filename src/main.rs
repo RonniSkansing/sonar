@@ -7,6 +7,7 @@ mod utils;
 
 use clap::{App, Arg, SubCommand};
 use logger::{LogLevel, Logger};
+use reqwest::Client;
 use tokio::runtime;
 
 struct Application<'a> {
@@ -131,6 +132,9 @@ fn main() {
     }
     let logger = Logger::new(log_level);
 
+    // setup http(s) client
+    let client: Client = Client::new();
+
     // setup runtime
     let mut runtime_builder = runtime::Builder::new();
     if matches.is_present(threads_arg.name) {
@@ -155,7 +159,7 @@ fn main() {
         (name, Some(_)) if name == init_command.name => commands::init::execute(logger),
         (name, Some(_)) if name == run_command.name => {
             let l = logger.clone();
-            runtime.block_on(commands::run::execute(logger));
+            runtime.block_on(commands::run::execute(logger, &client));
             l.log(String::from("lol"));
         }
         (_, _) => {
