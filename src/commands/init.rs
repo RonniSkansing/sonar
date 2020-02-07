@@ -13,6 +13,7 @@ pub fn execute(logger: Logger) {
             host: String::from("example.com"),
             r#type: TargetType::HTTP,
             interval: std::time::Duration::from_secs(1),
+            max_concurrent: 2,
             report: Report {
                 r#type: ReportType::FILE,
                 format: ReportFormat::FLAT,
@@ -22,8 +23,10 @@ pub fn execute(logger: Logger) {
         Target {
             name: String::from("name2-www.example.com"),
             host: String::from("www.example.com"),
+
             r#type: TargetType::HTTP,
             interval: std::time::Duration::from_secs(1),
+            max_concurrent: 2,
             report: Report {
                 r#type: ReportType::FILE,
                 format: ReportFormat::FLAT,
@@ -34,6 +37,7 @@ pub fn execute(logger: Logger) {
     let default_config = serde_yaml::to_string(&targets).expect("unexpected invalid yaml");
 
     let config_file_name = "./sonar.yaml";
+    // TODO stop if the file already exists - lets not delete the users stuff!
     let path = Path::new(config_file_name);
     let display = path.display();
 

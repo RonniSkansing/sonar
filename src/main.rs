@@ -106,6 +106,7 @@ fn main() {
     let app = App::new(sonar.name)
         .arg(debug_arg.into_clap())
         .arg(verbose_arg.into_clap())
+        // TODO attach this to the run command instead
         .arg(threads_arg.into_clap())
         .version(sonar.version)
         .author(sonar.author)
@@ -113,7 +114,6 @@ fn main() {
         .subcommand(init_command.into_clap())
         .subcommand(run_command.into_clap());
 
-    // TODO can I avoid a clone here?
     let mut app_help = app.clone();
 
     let matches = app.get_matches();
@@ -159,8 +159,11 @@ fn main() {
         (name, Some(_)) if name == init_command.name => commands::init::execute(logger),
         (name, Some(_)) if name == run_command.name => {
             let l = logger.clone();
-            runtime.block_on(commands::run::execute(logger, &client));
-            l.log(String::from("lol"));
+            runtime
+                .block_on(commands::run::execute(l, client))
+                .unwrap_or_else(|e| {
+                    logger.error(String::from(e.description()));
+                });
         }
         (_, _) => {
             app_help

@@ -6,7 +6,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use std::sync::mpsc::Receiver;
+use tokio::sync::mpsc::Receiver;
 
 pub struct FileReporter {
     file: File,
@@ -39,10 +39,10 @@ impl FileReporter {
         })
     }
 
-    pub fn listen(&mut self) {
+    pub async fn listen(&mut self) {
         loop {
-            match self.receiver.recv() {
-                Ok(dto) => {
+            match self.receiver.recv().await {
+                Some(dto) => {
                     let entry = Entry::from_dto(dto);
                     let line = format!("{} {}\n", entry.time.timestamp(), entry.response_code);
 
@@ -59,11 +59,8 @@ impl FileReporter {
                         }
                     }
                 }
-                Err(err) => {
-                    self.logger.error(format!(
-                        "failed to read from requester: {}",
-                        err.description()
-                    ));
+                None => {
+                    self.logger.error(format!("failed to read",));
                     break;
                 }
             }

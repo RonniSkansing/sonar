@@ -1,4 +1,5 @@
 use super::config::{ReportFormat, ReportType, Target, TargetType};
+use crate::messages::EntryDTO;
 use crate::reporters::file::FileReporter;
 use crate::requesters::http::HttpRequester;
 use crate::Logger;
@@ -7,26 +8,19 @@ use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use std::sync::mpsc::channel;
+
 use tokio::spawn;
+use tokio::sync::mpsc::channel;
 use tokio::task::JoinHandle;
 
-pub async fn execute<'a>(logger: Logger, client: &Client) {
-    // read and parse
-    let config_str = match read_to_string("./sonar.yaml") {
-        // TODO Reconsider the use of panic for missing file
-        Err(e) => panic!("failed to read sonar.yaml: {}", e.description()),
-        Ok(s) => s,
-    };
-    let config: Vec<Target> = match serde_yaml::from_str(&config_str) {
-        // TODO Reconsider the use of panic for missing file
-        Err(e) => panic!("failed to parse config: {}", e.description()),
-        Ok(conf) => conf,
-    };
+pub async fn execute<'a>(logger: Logger, client: Client) -> Result<(), Box<dyn Error>> {
+    // TODO improve error output
+    let config_str = read_to_string("./sonar.yaml")?;
+    let config: Vec<Target> = serde_yaml::from_str(&config_str)?;
 
     let mut tasks: Vec<JoinHandle<_>> = vec![];
     for target in config {
-        let (sender, recv) = channel();
+        let (sender, recv) = channel::<EntryDTO>(100);
         let reporter_location = target.report.location.clone();
 
         match target.report.format {
@@ -38,7 +32,8 @@ pub async fn execute<'a>(logger: Logger, client: &Client) {
                         logger.info(format!("Starting flat file reporter {}", reporter_location));
                         FileReporter::new(reporter_location, recv, logger)
                             .expect("failed to create flat file reporter")
-                            .listen();
+                            .listen()
+                            .await;
                     }));
                 }
                 ReportType::HTTP => unimplemented!(),
@@ -58,21 +53,10 @@ pub async fn execute<'a>(logger: Logger, client: &Client) {
                     "Starting HTTP requester for {} {}",
                     target.name, target.host
                 ));
-                // let client = client.clone();
-                let requester = HttpRequester::new(&client /*, &sender, logger.clone()*/);
+                let mut requester = HttpRequester::new(client.clone(), sender, logger.clone());
+
                 tasks.push(spawn(async move {
-                    requester.run(/*target.host.clone()*/);
-                    loop {
-                        /*
-                        let sender = sender.clone();
-                        let host = target.host.clone();
-                        let interval = target.interval.clone();
-                        let logger = logger.clone();
-                        let host = host.clone();
-                        let client = client.clone();
-                        */
-                        // tokio::time::delay_for(target.interval).await;
-                    }
+                    requester.run(target.clone()).await;
                 }));
             }
             TargetType::HTTPS => unimplemented!(),
@@ -85,6 +69,8 @@ pub async fn execute<'a>(logger: Logger, client: &Client) {
     for t in tasks {
         t.await.expect("failed to listen to task to completion");
     }
+
+    Ok(())
 }
 
 fn read_to_string(file: &str) -> Result<String, std::io::Error> {

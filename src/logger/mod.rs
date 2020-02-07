@@ -5,19 +5,6 @@ pub enum LogLevel {
     VERBOSE,
 }
 
-/*
-impl LogLevel {
-    pub fn from_string(s: &str) -> LogLevel {
-        match s {
-            "NONE" => LogLevel::NONE,
-            "NORMAL" => LogLevel::NORMAL,
-            "VERBOSE" => LogLevel::VERBOSE,
-            _ => panic!("Unknown log level {}", s),
-        }
-    }
-}
-*/
-
 #[derive(Debug, Clone)]
 pub struct Logger {
     level: LogLevel,
@@ -28,7 +15,6 @@ impl Logger {
         Logger { level: level }
     }
 
-    // TODO Implement something ala log<S: AsRef<String> .. Into<String>..
     pub fn error(&self, message: String) {
         match self.level {
             LogLevel::NONE => (),
