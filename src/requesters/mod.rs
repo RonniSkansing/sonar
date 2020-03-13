@@ -4,7 +4,49 @@ pub mod http {
     use crate::Logger;
     use chrono::Utc;
     use reqwest::Client;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::{sync::Arc, time::Duration};
     use tokio::sync::mpsc::Sender;
+    use tokio::sync::Mutex;
+
+    async fn concurrent_throttle<F, Output, Fut>(max_concurrent: u32, delay: Duration, t: F)
+    where
+        Fut: futures::Future<Output = Output> + Sync + Send + 'static,
+        Output: Sync + Send + 'static,
+        F: 'static + Send + Fn() -> Fut,
+    {
+        // main task to hold the concurrent ones
+        let counter = Arc::from(AtomicU32::from(0));
+        tokio::spawn(async move {
+            let tasks = Arc::from(Mutex::from(vec![]));
+            loop {
+                let (fut, abort) = futures::future::abortable(t());
+                let tasks = tasks.clone();
+                let n = counter.load(Ordering::SeqCst);
+                println!("{} concurrent, max is {}", n, max_concurrent);
+                if n < max_concurrent {
+                    let mut tasks = tasks.lock().await;
+                    let counter = counter.clone();
+                    let jh = tokio::spawn(async move {
+                        counter.fetch_add(1, Ordering::SeqCst);
+                        let _ = tokio::spawn(fut).await;
+                    });
+                    tasks.push((jh, abort));
+                    tokio::time::delay_for(delay).await;
+                    continue;
+                }
+                println!("too many concurrent - removing one from tail");
+                let mut tasks = tasks.lock().await;
+                // TODO loop all tasks up until the first uncompleted, abort the uncompleted and remove all of them from vec
+                let t = tasks.get(0).expect("could not get task at index 0");
+                t.1.abort();
+                tasks.remove(0);
+                counter.fetch_sub(1, Ordering::SeqCst);
+            }
+        })
+        .await
+        .unwrap();
+    }
 
     pub struct HttpRequester {
         client: Client,
@@ -21,33 +63,28 @@ pub mod http {
             }
         }
 
-        pub async fn run(&mut self, target: Target) {
+        pub async fn task(&mut self) {
             let _ = self.client;
-            let mut tasks = vec![]; // std::vec::Vec::with_capacity(target.max_concurrent)
-            loop {
-                {
-                    let mut sender = self.sender.clone();
-                    let target = target.clone();
-                    let logger = self.logger.clone();
-                    tasks.push(tokio::spawn(async move {
-                        logger.info(format!(
-                            "HTTP Requester - Sending HTTP request to {}",
-                            target.host
-                        ));
-                        let entry = Entry::new(Utc::now(), 200);
-                        match sender.send(entry.to_dto()).await {
-                            Ok(_) => (),
-                            Err(_) => {
-                                logger.info(String::from("Failed to send result"));
-                            }
-                        }
-                    }));
+            let sender = self.sender.clone();
+            //  let target = self.target.clone();
+            let logger = self.logger.clone();
+            // let requests_in_progress = requests_in_progress.clone();
+            // let requests_running = requests_running.clone();
+            logger.info(format!(
+                "HTTP Requester - Sending HTTP request to {}",
+                target.host
+            ));
+            let entry = Entry::new(Utc::now(), 200);
+            /*                         match sender.send(entry.to_dto()).await {
+                Ok(_) => (),
+                Err(_) => {
+                    logger.info(String::from("Failed to send result"));
                 }
-                tokio::time::delay_for(target.interval).await;
-                for t in tasks.drain(0..) {
-                    let _ = t.await;
-                }
-            }
+            } */
+        }
+
+        pub async fn run(&mut self, target: Target) {
+            concurrent_throttle(3, Duration::from_secs(1), || self.task());
         }
     }
 }
