@@ -2,7 +2,6 @@ use crate::messages::{Entry, EntryDTO};
 use crate::utils::file::Append;
 use log::*;
 
-use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
@@ -48,7 +47,7 @@ impl FileReporter {
                         entry.target.host
                     );
 
-                    info!("HTTP Reporter - {}", line);
+                    info!("File Reporter - {}", line);
 
                     match self.file.write((line + "\n").as_bytes()) {
                         Ok(_) => (),

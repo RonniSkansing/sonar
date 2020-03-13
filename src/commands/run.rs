@@ -45,18 +45,18 @@ pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
         };
 
         match target.r#type {
-            TargetType::HTTP => {
+            TargetType::HTTP | TargetType::HTTPS => {
                 info!(
                     "Starting HTTP requester for {} {}",
                     target.name, target.host
                 );
-                let mut requester = HttpRequester::new(client.clone(), sender);
+                let mut requester =
+                    HttpRequester::new(client.clone(), sender, target.r#type.clone());
 
                 tasks.push(spawn(async move {
                     requester.run(target.clone()).await;
                 }));
             }
-            TargetType::HTTPS => unimplemented!(),
             TargetType::TCP => unimplemented!(),
             TargetType::UDP => unimplemented!(),
             TargetType::IMCP => unimplemented!(),

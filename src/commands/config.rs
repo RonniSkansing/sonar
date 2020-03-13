@@ -47,9 +47,14 @@ pub struct Target {
     pub name: String,
     pub host: String,
     pub r#type: TargetType,
+    // how often a request should happen
     pub interval: Duration,
+    // if a request hits the timeout it is canceled
+    pub timeout: Duration,
+    // number of requests that can run concurrently. 2 means that up to 2 requests will be running a the same time
     pub max_concurrent: u32,
     pub report: Report,
+    // how to handle when max_concurrent and the next interval is hit.
     pub request_strategy: RequestStrategy,
 }
 

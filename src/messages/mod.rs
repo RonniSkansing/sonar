@@ -1,22 +1,24 @@
 use crate::commands::config::Target;
 use chrono::{DateTime, TimeZone, Utc};
 
+type ResponseCode = u16;
+
 #[derive(Debug)]
 pub struct Entry {
     pub time: DateTime<Utc>,
-    pub response_code: i32,
+    pub response_code: ResponseCode,
     pub target: Target,
 }
 
 #[derive(Debug)]
 pub struct EntryDTO {
     pub timestamp_seconds: i64,
-    pub response_code: i32,
+    pub response_code: ResponseCode,
     pub target: Target,
 }
 
 impl Entry {
-    pub fn new(time: DateTime<Utc>, response_code: i32, target: Target) -> Entry {
+    pub fn new(time: DateTime<Utc>, response_code: ResponseCode, target: Target) -> Entry {
         Entry {
             time,
             response_code,

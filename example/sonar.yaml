@@ -1,5 +1,5 @@
 ---
-- name: name-example.com
+- name: https-name-example.com
   host: example.com
   type: HTTPS
   interval:
@@ -8,4 +8,4 @@
   report:
     type: FILE
     format: FLAT
-    location: "./name-example.com"
+    location: "./https-name-example.com"

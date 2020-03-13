@@ -135,7 +135,12 @@ fn main() {
 
     // setup logger
     let mut loggers: Vec<Box<dyn SharedLogger>> = vec![];
-    let config = ConfigBuilder::new().build();
+    let config = ConfigBuilder::new()
+        .add_filter_ignore_str("mio")
+        .add_filter_ignore_str("hyper")
+        .add_filter_ignore_str("reqwest")
+        .add_filter_ignore_str("want")
+        .build();
     if !matches.is_present(quiet_arg.name) {
         loggers.push(
             TermLogger::new(LevelFilter::Trace, config.clone(), TerminalMode::Mixed).unwrap(),

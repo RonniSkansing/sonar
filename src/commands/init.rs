@@ -3,6 +3,7 @@ use log::*;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
+use std::time::Duration;
 
 pub fn execute() {
     let targets = vec![
@@ -10,8 +11,9 @@ pub fn execute() {
             name: String::from("name-example.com"),
             host: String::from("example.com"),
             r#type: TargetType::HTTP,
-            interval: std::time::Duration::from_secs(1),
+            interval: Duration::from_secs(1),
             max_concurrent: 2,
+            timeout: Duration::from_secs(5),
             request_strategy: RequestStrategy::Wait,
             report: Report {
                 r#type: ReportType::FILE,
@@ -24,8 +26,9 @@ pub fn execute() {
             host: String::from("www.example.com"),
 
             r#type: TargetType::HTTP,
-            interval: std::time::Duration::from_secs(1),
+            interval: Duration::from_secs(1),
             max_concurrent: 2,
+            timeout: Duration::from_secs(5),
             request_strategy: RequestStrategy::Wait,
             report: Report {
                 r#type: ReportType::FILE,

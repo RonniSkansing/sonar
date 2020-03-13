@@ -1,13 +1,15 @@
 pub mod http {
-    use crate::commands::config::Target;
+    use crate::commands::config::{RequestStrategy, Target, TargetType};
     use crate::messages::{Entry, EntryDTO};
+    use atomic::AtomicU32;
     use chrono::Utc;
     use log::*;
     use reqwest::Client;
-    use std::sync::atomic::{AtomicU32, Ordering};
-    use std::{sync::Arc, time::Duration};
+    use std::{
+        sync::atomic::{self, Ordering},
+        time::Duration,
+    };
     use tokio::sync::mpsc::Sender;
-    use tokio::sync::Mutex;
 
     /*
 
@@ -16,6 +18,12 @@ pub mod http {
 
     Right now it kinda defect because it will only clean up the task pool if it's it has a tasks that
     needs to be canceled.
+
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::{sync::Arc, time::Duration};
+    use tokio::sync::mpsc::Sender;
+    use tokio::sync::Mutex;
+
 
     async fn concurrent_throttle<F, Output, Fut>(max_concurrent: u32, delay: Duration, t: F)
     where
@@ -83,27 +91,81 @@ pub mod http {
     pub struct HttpRequester {
         client: Client,
         sender: Sender<EntryDTO>,
+        schema: TargetType,
     }
 
     impl HttpRequester {
-        pub fn new(client: Client, sender: Sender<EntryDTO>) -> HttpRequester {
+        pub fn new(client: Client, sender: Sender<EntryDTO>, schema: TargetType) -> HttpRequester {
             HttpRequester {
                 client: client,
                 sender: sender.clone(),
+                schema,
             }
         }
 
         pub async fn run(&mut self, target: Target) {
-            loop {
-                info!("Requesting {}", target.host);
-                let entry = Entry::new(Utc::now(), 200, target.clone());
-                match self.sender.send(entry.to_dto()).await {
-                    Ok(_) => (),
-                    Err(_) => {
-                        error!("Failed to send request result");
+            let url = format!(
+                "{}://{}",
+                self.schema.to_string().to_ascii_lowercase(),
+                target.host
+            );
+            info!(
+                "Starting requester for {} with strategy {}",
+                url, target.request_strategy
+            );
+
+            let mut interval = tokio::time::interval(target.interval);
+            let currently_running = std::sync::Arc::from(AtomicU32::new(0));
+            match target.request_strategy {
+                RequestStrategy::Wait => loop {
+                    if currently_running.load(Ordering::SeqCst) >= target.max_concurrent {
+                        warn!("Http Requester - {} - One or more requests are not delivered in time for more concurrent requests. Skipping a tick", url);
+                        interval.tick().await;
+                        continue;
                     }
+                    currently_running.fetch_add(1, Ordering::SeqCst);
+
+                    info!(
+                        "Http Requester - Concurrent {} - GET {}",
+                        currently_running.load(Ordering::SeqCst),
+                        url
+                    );
+
+                    let client = self.client.clone();
+                    let mut sender = self.sender.clone();
+                    let target = target.clone();
+                    let url = url.clone();
+                    let currently_running = currently_running.clone();
+                    tokio::spawn(async move {
+                        let req = client.get(&url).timeout(Duration::from(target.timeout));
+
+                        match req.send().await {
+                            Ok(res) => {
+                                let entry =
+                                    Entry::new(Utc::now(), res.status().as_u16(), target.clone());
+                                match sender.send(entry.to_dto()).await {
+                                    Ok(_) => (),
+                                    Err(err) => {
+                                        error!(
+                                            "Failed to send request result: {}",
+                                            err.to_string()
+                                        );
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                // TODO - Send this to reporter and log approriately
+                                error!("Failed request: {}", err)
+                            }
+                        }
+                        currently_running.fetch_sub(1, Ordering::SeqCst);
+                        info!("Finshed request!");
+                    });
+                    interval.tick().await;
+                },
+                RequestStrategy::CancelOldest => {
+                    unimplemented!("RequestStrategy::CancelOldest not implemented");
                 }
-                tokio::time::delay_for(target.interval).await;
             }
         }
     }
