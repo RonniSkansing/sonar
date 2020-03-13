@@ -1,13 +1,13 @@
 mod commands;
-mod logger;
 mod messages;
 mod reporters;
 mod requesters;
 mod utils;
 
 use clap::{App, Arg, SubCommand};
-use logger::{LogLevel, Logger};
+use log::*;
 use reqwest::Client;
+use simplelog::*;
 use tokio::runtime;
 
 struct Application<'a> {
@@ -91,6 +91,13 @@ fn main() {
         help: "Quiet",
     };
 
+    let no_file_output = SonarArg {
+        name: "no-file-output",
+        short: "n",
+        takes_value: &false,
+        help: "No file output",
+    };
+
     let init_command = SonarCommand {
         name: "init",
         about: "Inits a new project in the current directory",
@@ -106,13 +113,16 @@ fn main() {
     let app = App::new(sonar.name)
         .arg(debug_arg.into_clap())
         .arg(verbose_arg.into_clap())
-        // TODO attach this to the run command instead
-        .arg(threads_arg.into_clap())
         .version(sonar.version)
         .author(sonar.author)
         .about(sonar.about)
         .subcommand(init_command.into_clap())
-        .subcommand(run_command.into_clap());
+        .subcommand(
+            run_command
+                .into_clap()
+                .arg(no_file_output.into_clap())
+                .arg(threads_arg.into_clap()),
+        );
 
     let mut app_help = app.clone();
 
@@ -124,13 +134,15 @@ fn main() {
     }
 
     // setup logger
-    let mut log_level = LogLevel::NORMAL;
-    if matches.is_present(quiet_arg.name) {
-        log_level = LogLevel::NONE;
-    } else if matches.is_present(verbose_arg.name) {
-        log_level = LogLevel::VERBOSE;
+    let mut loggers: Vec<Box<dyn SharedLogger>> = vec![];
+    let config = ConfigBuilder::new().build();
+    if !matches.is_present(quiet_arg.name) {
+        loggers.push(
+            TermLogger::new(LevelFilter::Trace, config.clone(), TerminalMode::Mixed).unwrap(),
+        );
     }
-    let logger = Logger::new(log_level);
+
+    let _ = CombinedLogger::init(loggers).expect("Failed to setup logger");
 
     // setup http(s) client
     let client: Client = Client::new();
@@ -144,7 +156,7 @@ fn main() {
             .parse()
             .expect("failed to parse threads argument - invalid format");
         runtime_builder.max_threads(n);
-        logger.info(format!("Thread pool set to {}", n))
+        info!("Thread pool set to {}", n);
     }
 
     let mut runtime = runtime_builder
@@ -156,13 +168,12 @@ fn main() {
 
     // run command
     match matches.subcommand() {
-        (name, Some(_)) if name == init_command.name => commands::init::execute(logger),
+        (name, Some(_)) if name == init_command.name => commands::init::execute(),
         (name, Some(_)) if name == run_command.name => {
-            let l = logger.clone();
             runtime
-                .block_on(commands::run::execute(l, client))
+                .block_on(commands::run::execute(client))
                 .unwrap_or_else(|e| {
-                    logger.error(String::from(e.description()));
+                    error!("Failed to run {}", e.to_string());
                 });
         }
         (_, _) => {

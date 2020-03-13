@@ -1,12 +1,10 @@
-use super::config::{Report, ReportFormat, ReportType, Target, TargetType};
-use crate::Logger;
-
-use std::error::Error;
+use super::config::{Report, ReportFormat, ReportType, RequestStrategy, Target, TargetType};
+use log::*;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
-pub fn execute(logger: Logger) {
+pub fn execute() {
     let targets = vec![
         Target {
             name: String::from("name-example.com"),
@@ -14,6 +12,7 @@ pub fn execute(logger: Logger) {
             r#type: TargetType::HTTP,
             interval: std::time::Duration::from_secs(1),
             max_concurrent: 2,
+            request_strategy: RequestStrategy::Wait,
             report: Report {
                 r#type: ReportType::FILE,
                 format: ReportFormat::FLAT,
@@ -27,6 +26,7 @@ pub fn execute(logger: Logger) {
             r#type: TargetType::HTTP,
             interval: std::time::Duration::from_secs(1),
             max_concurrent: 2,
+            request_strategy: RequestStrategy::Wait,
             report: Report {
                 r#type: ReportType::FILE,
                 format: ReportFormat::FLAT,
@@ -45,14 +45,12 @@ pub fn execute(logger: Logger) {
         Err(reason) => panic!(
             "failed to create config {}: {}",
             display,
-            reason.description()
+            reason.to_string()
         ),
         Ok(file) => file,
     };
     match file.write_all(default_config.as_bytes()) {
-        Err(why) => panic!("failed to write config {}: {}", display, why.description()),
-        Ok(_) => logger.log(String::from(
-            "sample sonar.yaml created - Run 'sonar run' to begin monitoring",
-        )),
+        Err(why) => panic!("failed to write config {}: {}", display, why.to_string()),
+        Ok(_) => info!("sample sonar.yaml created - Run 'sonar run' to begin monitoring"),
     }
 }

@@ -25,6 +25,16 @@ pub enum ReportFormat {
     JSON,
 }
 
+// The strategy determins how requesting will be processed when the requester is asked
+// to do more requests concurrently then the max.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
+pub enum RequestStrategy {
+    // do not send a new request before one of the current requests are done
+    Wait,
+    // cancel the longest living unfinished request and start a new one immediatly
+    CancelOldest,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Report {
     pub r#type: ReportType,
@@ -40,6 +50,7 @@ pub struct Target {
     pub interval: Duration,
     pub max_concurrent: u32,
     pub report: Report,
+    pub request_strategy: RequestStrategy,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]

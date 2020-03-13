@@ -1,13 +1,21 @@
 pub mod http {
     use crate::commands::config::Target;
     use crate::messages::{Entry, EntryDTO};
-    use crate::Logger;
     use chrono::Utc;
+    use log::*;
     use reqwest::Client;
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::{sync::Arc, time::Duration};
     use tokio::sync::mpsc::Sender;
     use tokio::sync::Mutex;
+
+    /*
+
+    This was suppose to execute tasks, when too many tasks was running at the same time,
+    it should cancel the oldest not finished task and start a new new.
+
+    Right now it kinda defect because it will only clean up the task pool if it's it has a tasks that
+    needs to be canceled.
 
     async fn concurrent_throttle<F, Output, Fut>(max_concurrent: u32, delay: Duration, t: F)
     where
@@ -48,25 +56,12 @@ pub mod http {
         .unwrap();
     }
 
-    pub struct HttpRequester {
-        client: Client,
-        sender: Sender<EntryDTO>,
-        logger: Logger,
-    }
 
     impl HttpRequester {
-        pub fn new(client: Client, sender: Sender<EntryDTO>, logger: Logger) -> HttpRequester {
-            HttpRequester {
-                client: client,
-                sender: sender.clone(),
-                logger: logger,
-            }
-        }
-
-        pub async fn task(&mut self) {
+                pub async fn task(&mut self) {
             let _ = self.client;
             let sender = self.sender.clone();
-            //  let target = self.target.clone();
+            let target = self.target.clone();
             let logger = self.logger.clone();
             // let requests_in_progress = requests_in_progress.clone();
             // let requests_running = requests_running.clone();
@@ -82,9 +77,34 @@ pub mod http {
                 }
             } */
         }
+    }
+    */
+
+    pub struct HttpRequester {
+        client: Client,
+        sender: Sender<EntryDTO>,
+    }
+
+    impl HttpRequester {
+        pub fn new(client: Client, sender: Sender<EntryDTO>) -> HttpRequester {
+            HttpRequester {
+                client: client,
+                sender: sender.clone(),
+            }
+        }
 
         pub async fn run(&mut self, target: Target) {
-            concurrent_throttle(3, Duration::from_secs(1), || self.task());
+            loop {
+                info!("Requesting {}", target.host);
+                let entry = Entry::new(Utc::now(), 200, target.clone());
+                match self.sender.send(entry.to_dto()).await {
+                    Ok(_) => (),
+                    Err(_) => {
+                        error!("Failed to send request result");
+                    }
+                }
+                tokio::time::delay_for(target.interval).await;
+            }
         }
     }
 }

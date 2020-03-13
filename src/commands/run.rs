@@ -2,7 +2,7 @@ use super::config::{ReportFormat, ReportType, Target, TargetType};
 use crate::messages::EntryDTO;
 use crate::reporters::file::FileReporter;
 use crate::requesters::http::HttpRequester;
-use crate::Logger;
+use log::*;
 use reqwest::Client;
 use std::error::Error;
 use std::fs::File;
@@ -13,8 +13,7 @@ use tokio::spawn;
 use tokio::sync::mpsc::channel;
 use tokio::task::JoinHandle;
 
-pub async fn execute<'a>(logger: Logger, client: Client) -> Result<(), Box<dyn Error>> {
-    // TODO improve error output
+pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
     let config_str = read_to_string("./sonar.yaml")?;
     let config: Vec<Target> = serde_yaml::from_str(&config_str)?;
 
@@ -27,10 +26,9 @@ pub async fn execute<'a>(logger: Logger, client: Client) -> Result<(), Box<dyn E
             ReportFormat::FLAT => match target.report.r#type {
                 ReportType::FILE => {
                     // reporter
-                    let logger = logger.clone();
                     tasks.push(spawn(async move {
-                        logger.info(format!("Starting flat file reporter {}", reporter_location));
-                        FileReporter::new(reporter_location, recv, logger)
+                        info!("Starting flat file reporter {}", reporter_location);
+                        FileReporter::new(reporter_location, recv)
                             .expect("failed to create flat file reporter")
                             .listen()
                             .await;
@@ -48,12 +46,11 @@ pub async fn execute<'a>(logger: Logger, client: Client) -> Result<(), Box<dyn E
 
         match target.r#type {
             TargetType::HTTP => {
-                // TODO implement max concurrent requests and timeout limit
-                logger.info(format!(
+                info!(
                     "Starting HTTP requester for {} {}",
                     target.name, target.host
-                ));
-                let mut requester = HttpRequester::new(client.clone(), sender, logger.clone());
+                );
+                let mut requester = HttpRequester::new(client.clone(), sender);
 
                 tasks.push(spawn(async move {
                     requester.run(target.clone()).await;

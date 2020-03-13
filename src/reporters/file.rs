@@ -1,6 +1,6 @@
 use crate::messages::{Entry, EntryDTO};
 use crate::utils::file::Append;
-use crate::Logger;
+use log::*;
 
 use std::error::Error;
 use std::fs::File;
@@ -11,14 +11,12 @@ use tokio::sync::mpsc::Receiver;
 pub struct FileReporter {
     file: File,
     receiver: Receiver<EntryDTO>,
-    logger: Logger,
 }
 
 impl FileReporter {
     pub fn new(
         location: String,
         receiver: Receiver<EntryDTO>,
-        logger: Logger,
     ) -> Result<FileReporter, std::io::Error> {
         let file_path = Path::new(&location);
         let path = file_path
@@ -35,7 +33,6 @@ impl FileReporter {
         Ok(FileReporter {
             file: file,
             receiver: receiver,
-            logger: logger,
         })
     }
 
@@ -44,28 +41,30 @@ impl FileReporter {
             match self.receiver.recv().await {
                 Some(dto) => {
                     let entry = Entry::from_dto(dto);
-                    let line = format!("{} {}\n", entry.time.timestamp(), entry.response_code);
+                    let line = format!(
+                        "{} {} {}",
+                        entry.time.timestamp(),
+                        entry.response_code,
+                        entry.target.host
+                    );
 
-                    self.logger.info(format!("HTTP Reporter - {}", line));
+                    info!("HTTP Reporter - {}", line);
 
-                    match self.file.write(line.as_bytes()) {
+                    match self.file.write((line + "\n").as_bytes()) {
                         Ok(_) => (),
                         Err(err) => {
-                            self.logger.error(format!(
-                                "failed to write to log file: {}",
-                                err.description()
-                            ));
+                            error!("failed to write to log file: {}", err.to_string());
                             break;
                         }
                     }
                 }
                 None => {
-                    self.logger.error(format!("failed to read",));
+                    error!("failed to read - connection was broken");
                     break;
                 }
             }
         }
 
-        self.logger.info(String::from("Stopping FileReporter"));
+        info!("stopping FileReporter");
     }
 }
