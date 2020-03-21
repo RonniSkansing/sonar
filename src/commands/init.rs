@@ -42,7 +42,6 @@ pub fn execute() {
     let default_config = serde_yaml::to_string(&targets).expect("unexpected invalid yaml");
 
     let config_file_name = "./sonar.yaml";
-    // TODO stop if the file already exists - lets not delete the users stuff!
     let path = Path::new(config_file_name);
     let display = path.display();
 

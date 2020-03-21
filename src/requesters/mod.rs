@@ -5,10 +5,7 @@ pub mod http {
     use chrono::Utc;
     use log::*;
     use reqwest::Client;
-    use std::{
-        sync::atomic::{self, Ordering},
-        time::Duration,
-    };
+    use std::sync::atomic::{self, Ordering};
     use tokio::sync::mpsc::Sender;
 
     pub struct HttpRequester {
@@ -36,8 +33,8 @@ pub mod http {
                 "Starting requester for {} with strategy {}",
                 url, target.request_strategy
             );
-
             let mut interval = tokio::time::interval(target.interval.into());
+            interval.tick().await;
             let currently_running = std::sync::Arc::from(AtomicU32::new(0));
             match target.request_strategy {
                 RequestStrategy::Wait => loop {
