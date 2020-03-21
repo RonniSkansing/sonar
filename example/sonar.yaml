@@ -1,11 +1,29 @@
 ---
-- name: https-name-example.com
-  host: example.com
-  type: HTTPS
+- name: name-example.com
+  url: "http://example.com:8080"
   interval:
-    secs: 1
-    nanos: 0
+    seconds: 1
+    millis: 0
+  timeout:
+    seconds: 5
+    millis: 0
+  max_concurrent: 2
   report:
     type: FILE
     format: FLAT
-    location: "./https-name-example.com"
+    location: "./log/name-example.com.log"
+  request_strategy: Wait
+- name: name2-www.example.com
+  url: https://www.example.com
+  interval:
+    seconds: 1
+    millis: 0
+  timeout:
+    seconds: 5
+    millis: 0
+  max_concurrent: 2
+  report:
+    type: FILE
+    format: FLAT
+    location: "./log/name-example.com.log"
+  request_strategy: Wait

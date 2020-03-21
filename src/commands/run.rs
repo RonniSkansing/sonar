@@ -1,4 +1,4 @@
-use super::config::{ReportFormat, ReportType, Target};
+use super::config::Target;
 use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporter;
 use crate::requesters::http::HttpRequester;
@@ -22,22 +22,13 @@ pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
         let (sender, recv) = channel::<Result<EntryDTO, FailureDTO>>(100);
         let reporter_location = target.report.location.clone();
 
-        match (target.report.r#type, target.report.format) {
-            (ReportType::FILE, ReportFormat::FLAT) => {
-                tasks.push(spawn(async move {
-                    info!("Starting flat file reporter {}", reporter_location);
-                    FileReporter::new(reporter_location, recv)
-                        .expect("failed to create flat file reporter")
-                        .listen()
-                        .await;
-                }));
-            }
-            (ReportType::FILE, ReportFormat::JSON) => {}
-            (ReportType::HTTP, ReportFormat::FLAT) => {}
-            (ReportType::HTTP, ReportFormat::JSON) => {}
-            (ReportType::HTTPS, ReportFormat::FLAT) => {}
-            (ReportType::HTTPS, ReportFormat::JSON) => {}
-        }
+        tasks.push(spawn(async move {
+            info!("Starting flat file reporter {}", reporter_location);
+            FileReporter::new(reporter_location, recv)
+                .expect("failed to create flat file reporter")
+                .listen()
+                .await;
+        }));
 
         info!("Starting HTTP requester for {} {}", target.name, target.url);
         let mut requester = HttpRequester::new(client.clone(), sender);

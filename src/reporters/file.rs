@@ -31,7 +31,7 @@ impl FileReporter {
 
         Ok(FileReporter {
             file: file,
-            receiver: receiver,
+            receiver,
         })
     }
 

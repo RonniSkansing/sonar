@@ -25,19 +25,6 @@ impl From<Duration> for SecondMilliDuration {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
-pub enum ReportType {
-    FILE,
-    HTTP,
-    HTTPS,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
-pub enum ReportFormat {
-    FLAT,
-    JSON,
-}
-
 // The strategy determins how requesting will be processed when the requester is asked
 // to do more requests concurrently then the max.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
@@ -50,8 +37,6 @@ pub enum RequestStrategy {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Report {
-    pub r#type: ReportType,
-    pub format: ReportFormat,
     pub location: String,
 }
 

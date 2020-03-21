@@ -1,6 +1,4 @@
-use super::config::{
-    Report, ReportFormat, ReportType, RequestStrategy, SecondMilliDuration, Target,
-};
+use super::config::{Report, RequestStrategy, SecondMilliDuration, Target};
 use log::*;
 use std::fs::File;
 use std::io::prelude::*;
@@ -17,8 +15,6 @@ pub fn execute() {
             timeout: SecondMilliDuration::from(Duration::from_secs(5)),
             request_strategy: RequestStrategy::Wait,
             report: Report {
-                r#type: ReportType::FILE,
-                format: ReportFormat::FLAT,
                 location: String::from("./log/name-example.com.log"),
             },
         },
@@ -30,8 +26,6 @@ pub fn execute() {
             timeout: SecondMilliDuration::from(Duration::from_secs(5)),
             request_strategy: RequestStrategy::Wait,
             report: Report {
-                r#type: ReportType::FILE,
-                format: ReportFormat::FLAT,
                 location: String::from("./log/name-example.com.log"),
             },
         },
