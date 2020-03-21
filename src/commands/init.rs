@@ -1,4 +1,6 @@
-use super::config::{Report, ReportFormat, ReportType, RequestStrategy, Target, TargetType};
+use super::config::{
+    Report, ReportFormat, ReportType, RequestStrategy, SecondMilliDuration, Target, TargetType,
+};
 use log::*;
 use std::fs::File;
 use std::io::prelude::*;
@@ -11,9 +13,9 @@ pub fn execute() {
             name: String::from("name-example.com"),
             host: String::from("example.com"),
             r#type: TargetType::HTTP,
-            interval: Duration::from_secs(1),
+            interval: SecondMilliDuration::from(Duration::from_secs(1)),
             max_concurrent: 2,
-            timeout: Duration::from_secs(5),
+            timeout: SecondMilliDuration::from(Duration::from_secs(5)),
             request_strategy: RequestStrategy::Wait,
             report: Report {
                 r#type: ReportType::FILE,
@@ -26,9 +28,9 @@ pub fn execute() {
             host: String::from("www.example.com"),
 
             r#type: TargetType::HTTP,
-            interval: Duration::from_secs(1),
+            interval: SecondMilliDuration::from(Duration::from_secs(1)),
             max_concurrent: 2,
-            timeout: Duration::from_secs(5),
+            timeout: SecondMilliDuration::from(Duration::from_secs(5)),
             request_strategy: RequestStrategy::Wait,
             report: Report {
                 r#type: ReportType::FILE,
