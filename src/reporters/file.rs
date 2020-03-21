@@ -45,7 +45,7 @@ impl FileReporter {
                             "{} {} {}",
                             entry.time.timestamp(),
                             entry.response_code,
-                            entry.target.host
+                            entry.target.url
                         );
 
                         info!("File Reporter - {}", line);
@@ -63,7 +63,7 @@ impl FileReporter {
                         let line = format!(
                             "{} {} {}",
                             entry.time.timestamp(),
-                            entry.target.host,
+                            entry.target.url,
                             entry.reason
                         );
 

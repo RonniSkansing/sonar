@@ -25,23 +25,14 @@ impl From<Duration> for SecondMilliDuration {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
-pub enum TargetType {
-    HTTP,
-    HTTPS,
-    UDP,
-    TCP,
-    IMCP,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
 pub enum ReportType {
     FILE,
     HTTP,
     HTTPS,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
 pub enum ReportFormat {
     FLAT,
     JSON,
@@ -67,8 +58,7 @@ pub struct Report {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Target {
     pub name: String,
-    pub host: String,
-    pub r#type: TargetType,
+    pub url: String,
     // how often a request should happen
     pub interval: SecondMilliDuration,
     // if a request hits the timeout it is canceled
@@ -80,7 +70,7 @@ pub struct Target {
     pub request_strategy: RequestStrategy,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
     pub targets: Vec<Target>,
 }

@@ -1,5 +1,5 @@
 pub mod http {
-    use crate::commands::config::{RequestStrategy, Target, TargetType};
+    use crate::commands::config::{RequestStrategy, Target};
     use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
     use atomic::AtomicU32;
     use chrono::Utc;
@@ -11,31 +11,20 @@ pub mod http {
     pub struct HttpRequester {
         client: Client,
         sender: Sender<Result<EntryDTO, FailureDTO>>,
-        schema: TargetType,
     }
 
     impl HttpRequester {
-        pub fn new(
-            client: Client,
-            sender: Sender<Result<EntryDTO, FailureDTO>>,
-            schema: TargetType,
-        ) -> HttpRequester {
+        pub fn new(client: Client, sender: Sender<Result<EntryDTO, FailureDTO>>) -> HttpRequester {
             HttpRequester {
                 client: client,
                 sender: sender.clone(),
-                schema,
             }
         }
 
         pub async fn run(&mut self, target: Target) {
-            let url = format!(
-                "{}://{}",
-                self.schema.to_string().to_ascii_lowercase(),
-                target.host
-            );
             info!(
                 "Starting requester for {} with strategy {}",
-                url, target.request_strategy
+                target.url, target.request_strategy
             );
             let mut interval = tokio::time::interval(target.interval.into());
             interval.tick().await;
@@ -43,7 +32,7 @@ pub mod http {
             match target.request_strategy {
                 RequestStrategy::Wait => loop {
                     if currently_running.load(Ordering::SeqCst) >= target.max_concurrent {
-                        warn!("Http Requester - {} - One or more requests are not delivered in time for more concurrent requests. Skipping a tick", url);
+                        warn!("Http Requester - {} - One or more requests are not delivered in time for more concurrent requests. Skipping a tick", target.url);
                         interval.tick().await;
                         continue;
                     }
@@ -52,16 +41,15 @@ pub mod http {
                     info!(
                         "Http Requester - Concurrent {} - GET {}",
                         currently_running.load(Ordering::SeqCst),
-                        url
+                        target.url
                     );
 
                     let client = self.client.clone();
                     let mut sender = self.sender.clone();
                     let target = target.clone();
-                    let url = url.clone();
                     let currently_running = currently_running.clone();
                     tokio::spawn(async move {
-                        let req = client.get(&url).timeout(target.timeout.into());
+                        let req = client.get(&target.url).timeout(target.timeout.into());
 
                         match req.send().await {
                             Ok(res) => {

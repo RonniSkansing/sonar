@@ -1,5 +1,5 @@
 use super::config::{
-    Report, ReportFormat, ReportType, RequestStrategy, SecondMilliDuration, Target, TargetType,
+    Report, ReportFormat, ReportType, RequestStrategy, SecondMilliDuration, Target,
 };
 use log::*;
 use std::fs::File;
@@ -11,8 +11,7 @@ pub fn execute() {
     let targets = vec![
         Target {
             name: String::from("name-example.com"),
-            host: String::from("example.com"),
-            r#type: TargetType::HTTP,
+            url: String::from("http://example.com"),
             interval: SecondMilliDuration::from(Duration::from_secs(1)),
             max_concurrent: 2,
             timeout: SecondMilliDuration::from(Duration::from_secs(5)),
@@ -25,9 +24,7 @@ pub fn execute() {
         },
         Target {
             name: String::from("name2-www.example.com"),
-            host: String::from("www.example.com"),
-
-            r#type: TargetType::HTTP,
+            url: String::from("www.example.com"),
             interval: SecondMilliDuration::from(Duration::from_secs(1)),
             max_concurrent: 2,
             timeout: SecondMilliDuration::from(Duration::from_secs(5)),

@@ -1,4 +1,4 @@
-use super::config::{ReportFormat, ReportType, Target, TargetType};
+use super::config::{ReportFormat, ReportType, Target};
 use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporter;
 use crate::requesters::http::HttpRequester;
@@ -22,45 +22,30 @@ pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
         let (sender, recv) = channel::<Result<EntryDTO, FailureDTO>>(100);
         let reporter_location = target.report.location.clone();
 
-        match target.report.format {
-            ReportFormat::FLAT => match target.report.r#type {
-                ReportType::FILE => {
-                    // reporter
-                    tasks.push(spawn(async move {
-                        info!("Starting flat file reporter {}", reporter_location);
-                        FileReporter::new(reporter_location, recv)
-                            .expect("failed to create flat file reporter")
-                            .listen()
-                            .await;
-                    }));
-                }
-                ReportType::HTTP => unimplemented!(),
-                ReportType::HTTPS => unimplemented!(),
-            },
-            ReportFormat::JSON => match target.report.r#type {
-                ReportType::FILE => unimplemented!(),
-                ReportType::HTTP => unimplemented!(),
-                ReportType::HTTPS => unimplemented!(),
-            },
-        };
-
-        match target.r#type {
-            TargetType::HTTP | TargetType::HTTPS => {
-                info!(
-                    "Starting HTTP requester for {} {}",
-                    target.name, target.host
-                );
-                let mut requester =
-                    HttpRequester::new(client.clone(), sender, target.r#type.clone());
-
+        match (target.report.r#type, target.report.format) {
+            (ReportType::FILE, ReportFormat::FLAT) => {
                 tasks.push(spawn(async move {
-                    requester.run(target.clone()).await;
+                    info!("Starting flat file reporter {}", reporter_location);
+                    FileReporter::new(reporter_location, recv)
+                        .expect("failed to create flat file reporter")
+                        .listen()
+                        .await;
                 }));
             }
-            TargetType::TCP => unimplemented!(),
-            TargetType::UDP => unimplemented!(),
-            TargetType::IMCP => unimplemented!(),
+            (ReportType::FILE, ReportFormat::JSON) => {}
+            (ReportType::HTTP, ReportFormat::FLAT) => {}
+            (ReportType::HTTP, ReportFormat::JSON) => {}
+            (ReportType::HTTPS, ReportFormat::FLAT) => {}
+            (ReportType::HTTPS, ReportFormat::JSON) => {}
         }
+
+        info!("Starting HTTP requester for {} {}", target.name, target.url);
+        let mut requester = HttpRequester::new(client.clone(), sender);
+
+        let target = target.clone();
+        tasks.push(spawn(async move {
+            requester.run(target).await;
+        }));
     }
 
     for t in tasks {
