@@ -1,6 +1,6 @@
 pub mod http {
     use crate::commands::config::{RequestStrategy, Target, TargetType};
-    use crate::messages::{Entry, EntryDTO};
+    use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
     use atomic::AtomicU32;
     use chrono::Utc;
     use log::*;
@@ -10,12 +10,16 @@ pub mod http {
 
     pub struct HttpRequester {
         client: Client,
-        sender: Sender<EntryDTO>,
+        sender: Sender<Result<EntryDTO, FailureDTO>>,
         schema: TargetType,
     }
 
     impl HttpRequester {
-        pub fn new(client: Client, sender: Sender<EntryDTO>, schema: TargetType) -> HttpRequester {
+        pub fn new(
+            client: Client,
+            sender: Sender<Result<EntryDTO, FailureDTO>>,
+            schema: TargetType,
+        ) -> HttpRequester {
             HttpRequester {
                 client: client,
                 sender: sender.clone(),
@@ -63,7 +67,7 @@ pub mod http {
                             Ok(res) => {
                                 let entry =
                                     Entry::new(Utc::now(), res.status().as_u16(), target.clone());
-                                match sender.send(entry.to_dto()).await {
+                                match sender.send(Ok(entry.to_dto())).await {
                                     Ok(_) => (),
                                     Err(err) => {
                                         error!(
@@ -74,12 +78,20 @@ pub mod http {
                                 }
                             }
                             Err(err) => {
-                                // TODO - Send this to reporter and log approriately
-                                error!("Failed request: {}", err)
+                                let message =
+                                    Failure::new(Utc::now(), err.to_string(), target.clone());
+                                match sender.send(Err(message.to_dto())).await {
+                                    Ok(_) => (),
+                                    Err(err) => {
+                                        error!(
+                                            "Failed to send request result: {}",
+                                            err.to_string()
+                                        );
+                                    }
+                                }
                             }
                         }
                         currently_running.fetch_sub(1, Ordering::SeqCst);
-                        info!("Finshed request!");
                     });
                     interval.tick().await;
                 },

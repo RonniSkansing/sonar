@@ -1,5 +1,5 @@
 use super::config::{ReportFormat, ReportType, Target, TargetType};
-use crate::messages::EntryDTO;
+use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporter;
 use crate::requesters::http::HttpRequester;
 use log::*;
@@ -19,7 +19,7 @@ pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
 
     let mut tasks: Vec<JoinHandle<_>> = vec![];
     for target in config {
-        let (sender, recv) = channel::<EntryDTO>(100);
+        let (sender, recv) = channel::<Result<EntryDTO, FailureDTO>>(100);
         let reporter_location = target.report.location.clone();
 
         match target.report.format {
