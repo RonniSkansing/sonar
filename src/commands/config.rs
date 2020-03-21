@@ -35,9 +35,17 @@ pub enum RequestStrategy {
     CancelOldest,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
+pub enum ReportOn {
+    Success,
+    Failure,
+    Both,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Report {
     pub location: String,
+    pub report_on: ReportOn,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

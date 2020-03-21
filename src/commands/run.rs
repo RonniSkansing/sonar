@@ -23,7 +23,7 @@ pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
         let reporter_location = target.report.location.clone();
 
         tasks.push(spawn(async move {
-            info!("Starting flat file reporter {}", reporter_location);
+            debug!("Starting flat file reporter {}", reporter_location);
             FileReporter::new(reporter_location, recv)
                 .expect("failed to create flat file reporter")
                 .listen()

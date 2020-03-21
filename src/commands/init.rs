@@ -1,4 +1,4 @@
-use super::config::{Report, RequestStrategy, SecondMilliDuration, Target};
+use super::config::{Report, ReportOn, RequestStrategy, SecondMilliDuration, Target};
 use log::*;
 use std::fs::File;
 use std::io::prelude::*;
@@ -16,6 +16,7 @@ pub fn execute() {
             request_strategy: RequestStrategy::Wait,
             report: Report {
                 location: String::from("./log/name-example.com.log"),
+                report_on: ReportOn::Failure,
             },
         },
         Target {
@@ -27,6 +28,7 @@ pub fn execute() {
             request_strategy: RequestStrategy::Wait,
             report: Report {
                 location: String::from("./log/name-example.com.log"),
+                report_on: ReportOn::Success,
             },
         },
     ];

@@ -1,5 +1,5 @@
 pub mod http {
-    use crate::commands::config::{RequestStrategy, Target};
+    use crate::commands::config::{ReportOn, RequestStrategy, Target};
     use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
     use atomic::AtomicU32;
     use chrono::Utc;
@@ -48,36 +48,46 @@ pub mod http {
                     let mut sender = self.sender.clone();
                     let target = target.clone();
                     let currently_running = currently_running.clone();
+                    let report_on = target.report.report_on.clone();
                     tokio::spawn(async move {
                         let req = client.get(&target.url).timeout(target.timeout.into());
 
                         match req.send().await {
-                            Ok(res) => {
-                                let entry =
-                                    Entry::new(Utc::now(), res.status().as_u16(), target.clone());
-                                match sender.send(Ok(entry.to_dto())).await {
-                                    Ok(_) => (),
-                                    Err(err) => {
-                                        error!(
-                                            "Failed to send request result: {}",
-                                            err.to_string()
-                                        );
+                            Ok(res) => match report_on {
+                                ReportOn::Success | ReportOn::Both => {
+                                    let entry = Entry::new(
+                                        Utc::now(),
+                                        res.status().as_u16(),
+                                        target.clone(),
+                                    );
+                                    match sender.send(Ok(entry.to_dto())).await {
+                                        Ok(_) => (),
+                                        Err(err) => {
+                                            error!(
+                                                "Failed to send request result: {}",
+                                                err.to_string()
+                                            );
+                                        }
                                     }
                                 }
-                            }
-                            Err(err) => {
-                                let message =
-                                    Failure::new(Utc::now(), err.to_string(), target.clone());
-                                match sender.send(Err(message.to_dto())).await {
-                                    Ok(_) => (),
-                                    Err(err) => {
-                                        error!(
-                                            "Failed to send request result: {}",
-                                            err.to_string()
-                                        );
+                                _ => (),
+                            },
+                            Err(err) => match report_on {
+                                ReportOn::Failure | ReportOn::Both => {
+                                    let message =
+                                        Failure::new(Utc::now(), err.to_string(), target.clone());
+                                    match sender.send(Err(message.to_dto())).await {
+                                        Ok(_) => (),
+                                        Err(err) => {
+                                            error!(
+                                                "Failed to send request result: {}",
+                                                err.to_string()
+                                            );
+                                        }
                                     }
                                 }
-                            }
+                                _ => (),
+                            },
                         }
                         currently_running.fetch_sub(1, Ordering::SeqCst);
                     });

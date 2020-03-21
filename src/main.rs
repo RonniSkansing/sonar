@@ -47,14 +47,6 @@ impl SonarArg<'_> {
     }
 }
 
-/* TODO : this could be cool ..
-impl Into<SubCommand> for SonarCommand {
-    fn into(&self) -> SubCommand {
-
-    }
-}
-*/
-
 fn main() {
     let sonar = Application {
         name: "Sonar",
