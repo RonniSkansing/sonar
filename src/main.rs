@@ -4,7 +4,7 @@ mod reporters;
 mod requesters;
 mod utils;
 
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg, Shell, SubCommand};
 use log::*;
 use reqwest::Client;
 use simplelog::*;
@@ -114,9 +114,19 @@ fn main() {
                 .into_clap()
                 .arg(no_file_output.into_clap())
                 .arg(threads_arg.into_clap()),
+        )
+        .subcommand(
+            SubCommand::with_name("autocomplete")
+                .about("Generates completion scripts for your shell")
+                .arg(
+                    Arg::with_name("SHELL")
+                        .required(true)
+                        .possible_values(&["bash", "fish", "zsh"])
+                        .help("The shell to generate the script for"),
+                ),
         );
 
-    let mut app_help = app.clone();
+    let mut app_clone = app.clone();
 
     let matches = app.get_matches();
 
@@ -173,8 +183,12 @@ fn main() {
                     error!("Failed to run {}", e.to_string());
                 });
         }
+        ("autocomplete", Some(sub_matches)) => {
+            let shell: Shell = sub_matches.value_of("SHELL").unwrap().parse().unwrap();
+            app_clone.gen_completions_to("sonar", shell, &mut std::io::stdout());
+        }
         (_, _) => {
-            app_help
+            app_clone
                 .print_long_help()
                 .expect("Failed to print error message. Sorry.");
             println!("");
