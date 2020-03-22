@@ -28,7 +28,7 @@ pub fn execute() {
             request_strategy: RequestStrategy::Wait,
             report: Report {
                 location: String::from("./log/name-example.com.log"),
-                report_on: ReportOn::Success,
+                report_on: ReportOn::Failure,
             },
         },
     ];

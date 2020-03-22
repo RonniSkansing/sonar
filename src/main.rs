@@ -69,13 +69,6 @@ fn main() {
         help: "Max number of threads. The default value is the number of cores available to the system.",
     };
 
-    let verbose_arg = SonarArg {
-        name: "verbose",
-        short: "v",
-        takes_value: &false,
-        help: "Verbose",
-    };
-
     let quiet_arg = SonarArg {
         name: "quiet",
         short: "q",
@@ -104,7 +97,6 @@ fn main() {
 
     let app = App::new(sonar.name)
         .arg(debug_arg.into_clap())
-        .arg(verbose_arg.into_clap())
         .version(sonar.version)
         .author(sonar.author)
         .about(sonar.about)
@@ -131,7 +123,8 @@ fn main() {
     let matches = app.get_matches();
 
     // config debug
-    if matches.is_present(debug_arg.name) {
+    let is_debug = matches.is_present(debug_arg.name);
+    if is_debug {
         std::env::set_var("RUST_BACKTRACE", "1");
     }
 
@@ -144,9 +137,13 @@ fn main() {
         .add_filter_ignore_str("want")
         .build();
     if !matches.is_present(quiet_arg.name) {
-        loggers.push(
-            TermLogger::new(LevelFilter::Trace, config.clone(), TerminalMode::Mixed).unwrap(),
-        );
+        let filter: LevelFilter = if is_debug {
+            LevelFilter::Trace
+        } else {
+            LevelFilter::Info
+        };
+
+        loggers.push(TermLogger::new(filter, config.clone(), TerminalMode::Mixed).unwrap());
     }
 
     let _ = CombinedLogger::init(loggers).expect("Failed to setup logger");
