@@ -38,7 +38,7 @@ pub mod http {
                     }
                     currently_running.fetch_add(1, Ordering::SeqCst);
 
-                    info!(
+                    debug!(
                         "Http Requester - Concurrent {} - GET {}",
                         currently_running.load(Ordering::SeqCst),
                         target.url

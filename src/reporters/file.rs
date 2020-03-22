@@ -61,13 +61,13 @@ impl FileReporter {
                     Err(dto) => {
                         let entry = Failure::from_dto(dto);
                         let line = format!(
-                            "{} {} {}",
+                            "{} {} {}\n",
                             entry.time.timestamp(),
                             entry.target.url,
                             entry.reason
                         );
 
-                        info!("File Reporter - {}", line);
+                        error!("File Reporter - {} {}", entry.target.url, entry.reason);
 
                         match self.file.write((line + "\n").as_bytes()) {
                             Ok(_) => (),
@@ -84,7 +84,5 @@ impl FileReporter {
                 }
             }
         }
-
-        info!("stopping FileReporter");
     }
 }

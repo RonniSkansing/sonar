@@ -30,7 +30,6 @@ pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
                 .await;
         }));
 
-        info!("Starting HTTP requester for {} {}", target.name, target.url);
         let mut requester = HttpRequester::new(client.clone(), sender);
 
         let target = target.clone();

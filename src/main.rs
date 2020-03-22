@@ -160,7 +160,7 @@ fn main() {
             .parse()
             .expect("failed to parse threads argument - invalid format");
         runtime_builder.max_threads(n);
-        info!("Thread pool set to {}", n);
+        debug!("Thread pool set to {}", n);
     }
 
     let mut runtime = runtime_builder
