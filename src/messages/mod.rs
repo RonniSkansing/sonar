@@ -3,14 +3,14 @@ use chrono::{DateTime, TimeZone, Utc};
 
 type ResponseCode = u16;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Entry {
     pub time: DateTime<Utc>,
     pub response_code: ResponseCode,
     pub target: Target,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EntryDTO {
     pub timestamp_seconds: i64,
     pub response_code: ResponseCode,
@@ -43,14 +43,14 @@ impl Entry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Failure {
     pub time: DateTime<Utc>,
     pub reason: String,
     pub target: Target,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FailureDTO {
     pub timestamp_seconds: i64,
     pub reason: String,

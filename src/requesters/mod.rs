@@ -6,7 +6,7 @@ pub mod http {
     use log::*;
     use reqwest::Client;
     use std::sync::atomic::{self, Ordering};
-    use tokio::sync::mpsc::Sender;
+    use tokio::sync::broadcast::Sender;
 
     pub struct HttpRequester {
         client: Client,
@@ -45,7 +45,7 @@ pub mod http {
                     );
 
                     let client = self.client.clone();
-                    let mut sender = self.sender.clone();
+                    let sender = self.sender.clone();
                     let target = target.clone();
                     let currently_running = currently_running.clone();
                     let report_on = target.report.report_on.clone();
@@ -55,20 +55,14 @@ pub mod http {
                         match req.send().await {
                             Ok(res) => match report_on {
                                 ReportOn::Success | ReportOn::Both => {
-                                    let entry = Entry::new(
+                                    let message = Entry::new(
                                         Utc::now(),
                                         res.status().as_u16(),
                                         target.clone(),
                                     );
-                                    match sender.send(Ok(entry.to_dto())).await {
-                                        Ok(_) => (),
-                                        Err(err) => {
-                                            error!(
-                                                "Failed to send request result: {}",
-                                                err.to_string()
-                                            );
-                                        }
-                                    }
+                                    sender
+                                        .send(Ok(message.to_dto()))
+                                        .expect("Failed to send request result");
                                 }
                                 _ => (),
                             },
@@ -76,15 +70,9 @@ pub mod http {
                                 ReportOn::Failure | ReportOn::Both => {
                                     let message =
                                         Failure::new(Utc::now(), err.to_string(), target.clone());
-                                    match sender.send(Err(message.to_dto())).await {
-                                        Ok(_) => (),
-                                        Err(err) => {
-                                            error!(
-                                                "Failed to send request result: {}",
-                                                err.to_string()
-                                            );
-                                        }
-                                    }
+                                    sender
+                                        .send(Err(message.to_dto()))
+                                        .expect("Failed to send request result");
                                 }
                                 _ => (),
                             },

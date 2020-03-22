@@ -5,7 +5,7 @@ use log::*;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::broadcast::Receiver;
 
 pub struct FileReporter {
     file: File,
@@ -38,7 +38,7 @@ impl FileReporter {
     pub async fn listen(&mut self) {
         loop {
             match self.receiver.recv().await {
-                Some(result) => match result {
+                Ok(result) => match result {
                     Ok(dto) => {
                         let entry = Entry::from_dto(dto);
                         let line = format!(
@@ -78,8 +78,8 @@ impl FileReporter {
                         }
                     }
                 },
-                None => {
-                    error!("failed to read - connection was broken");
+                Err(err) => {
+                    error!("failed to read: {}", err.to_string());
                     break;
                 }
             }

@@ -1,7 +1,7 @@
 use super::config::Config;
 use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporter;
-use crate::requesters::http::HttpRequester;
+use crate::{requesters::http::HttpRequester, server::SonarServer};
 use log::*;
 use reqwest::Client;
 use std::error::Error;
@@ -10,20 +10,21 @@ use std::io::prelude::*;
 use std::path::Path;
 
 use tokio::spawn;
-use tokio::sync::mpsc::channel;
+use tokio::sync::broadcast::channel;
 use tokio::task::JoinHandle;
 
 pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
     let config_str = read_to_string("./sonar.yaml")?;
     let config: Config = serde_yaml::from_str(&config_str)?;
-    // let server_config = config.server.clone();
+    let server_config = config.server.clone();
     let mut tasks: Vec<JoinHandle<_>> = vec![];
 
     let mut receivers = vec![];
     // TODO send a start signal to all requesters when everything is ready so we do not loose requests
     for target in config.targets {
+        // TODO set the capacity to be number of concurrent requests?
         let (sender, recv) = channel::<Result<EntryDTO, FailureDTO>>(100);
-        receivers.push(sender.clone());
+        receivers.push(sender.subscribe());
         let reporter_location = target.report.location.clone();
 
         tasks.push(spawn(async move {
@@ -41,7 +42,12 @@ pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
         }));
     }
 
-    for t in tasks {
+    tasks.push(spawn(async move {
+        let server = SonarServer::new(server_config, receivers);
+        server.start().await;
+    }));
+
+    for t in tasks.drain(..) {
         t.await.expect("failed to listen to task to completion");
     }
 
