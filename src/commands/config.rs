@@ -63,8 +63,15 @@ pub struct Target {
     pub request_strategy: RequestStrategy,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ServerConfig {
+    pub port: u16,
+    pub ip: String,
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
+    pub server: ServerConfig,
     pub targets: Vec<Target>,
 }
 

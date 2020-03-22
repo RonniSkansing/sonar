@@ -1,4 +1,6 @@
-use super::config::{Report, ReportOn, RequestStrategy, SecondMilliDuration, Target};
+use super::config::{
+    Config, Report, ReportOn, RequestStrategy, SecondMilliDuration, ServerConfig, Target,
+};
 use log::*;
 use std::fs::File;
 use std::io::prelude::*;
@@ -6,6 +8,10 @@ use std::path::Path;
 use std::time::Duration;
 
 pub fn execute() {
+    let server = ServerConfig {
+        ip: String::from("127.0.0.1"),
+        port: 8080,
+    };
     let targets = vec![
         Target {
             name: String::from("name-example.com"),
@@ -32,7 +38,9 @@ pub fn execute() {
             },
         },
     ];
-    let default_config = serde_yaml::to_string(&targets).expect("unexpected invalid yaml");
+
+    let default_config =
+        serde_yaml::to_string(&Config { server, targets }).expect("unexpected invalid yaml");
 
     let config_file_name = "./sonar.yaml";
     let path = Path::new(config_file_name);

@@ -1,4 +1,4 @@
-use super::config::Target;
+use super::config::Config;
 use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporter;
 use crate::requesters::http::HttpRequester;
@@ -15,11 +15,15 @@ use tokio::task::JoinHandle;
 
 pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
     let config_str = read_to_string("./sonar.yaml")?;
-    let config: Vec<Target> = serde_yaml::from_str(&config_str)?;
-
+    let config: Config = serde_yaml::from_str(&config_str)?;
+    // let server_config = config.server.clone();
     let mut tasks: Vec<JoinHandle<_>> = vec![];
-    for target in config {
+
+    let mut receivers = vec![];
+    // TODO send a start signal to all requesters when everything is ready so we do not loose requests
+    for target in config.targets {
         let (sender, recv) = channel::<Result<EntryDTO, FailureDTO>>(100);
+        receivers.push(sender.clone());
         let reporter_location = target.report.location.clone();
 
         tasks.push(spawn(async move {
@@ -31,7 +35,6 @@ pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
         }));
 
         let mut requester = HttpRequester::new(client.clone(), sender);
-
         let target = target.clone();
         tasks.push(spawn(async move {
             requester.run(target).await;

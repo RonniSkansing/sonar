@@ -42,15 +42,15 @@ impl FileReporter {
                     Ok(dto) => {
                         let entry = Entry::from_dto(dto);
                         let line = format!(
-                            "{} {} {}",
+                            "{} {} {}\n",
                             entry.time.timestamp(),
                             entry.response_code,
                             entry.target.url
                         );
 
-                        info!("File Reporter - {}", line);
+                        info!("{}", line.trim());
 
-                        match self.file.write((line + "\n").as_bytes()) {
+                        match self.file.write(line.as_bytes()) {
                             Ok(_) => (),
                             Err(err) => {
                                 error!("failed to write to log file: {}", err.to_string());
@@ -61,15 +61,15 @@ impl FileReporter {
                     Err(dto) => {
                         let entry = Failure::from_dto(dto);
                         let line = format!(
-                            "{} {} {}\n",
+                            "{} ERR {} {}\n",
                             entry.time.timestamp(),
                             entry.target.url,
-                            entry.reason
+                            entry.reason.trim()
                         );
 
-                        error!("File Reporter - {} {}", entry.target.url, entry.reason);
+                        error!("{} {}", entry.target.url, entry.reason.trim());
 
-                        match self.file.write((line + "\n").as_bytes()) {
+                        match self.file.write((line).as_bytes()) {
                             Ok(_) => (),
                             Err(err) => {
                                 error!("failed to write to log file: {}", err.to_string());

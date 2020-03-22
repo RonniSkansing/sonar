@@ -2,6 +2,7 @@ mod commands;
 mod messages;
 mod reporters;
 mod requesters;
+mod server;
 mod utils;
 
 use clap::{App, Arg, Shell, SubCommand};
