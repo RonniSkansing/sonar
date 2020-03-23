@@ -17,6 +17,7 @@ pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
     let config_str = read_to_string("./sonar.yaml")?;
     let config: Config = serde_yaml::from_str(&config_str)?;
     let server_config = config.server.clone();
+    let config_targets = config.targets.clone();
     let mut tasks: Vec<JoinHandle<_>> = vec![];
 
     let mut receivers = vec![];
@@ -43,8 +44,8 @@ pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
     }
 
     tasks.push(spawn(async move {
-        let server = SonarServer::new(server_config, receivers);
-        server.start().await;
+        let server = SonarServer::new(server_config, config_targets);
+        server.start(receivers).await;
     }));
 
     for t in tasks.drain(..) {
