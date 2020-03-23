@@ -1,5 +1,5 @@
 pub mod http {
-    use crate::commands::config::{ReportOn, RequestStrategy, Target};
+    use crate::commands::config::{RequestStrategy, Target};
     use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
     use atomic::AtomicU32;
     use chrono::Utc;
@@ -22,7 +22,7 @@ pub mod http {
         }
 
         pub async fn run(&mut self, target: Target) {
-            info!(
+            debug!(
                 "Starting requester for {} with strategy {}",
                 target.url, target.request_strategy
             );
@@ -48,34 +48,24 @@ pub mod http {
                     let sender = self.sender.clone();
                     let target = target.clone();
                     let currently_running = currently_running.clone();
-                    let report_on = target.report.report_on.clone();
                     tokio::spawn(async move {
                         let req = client.get(&target.url).timeout(target.timeout.into());
 
                         match req.send().await {
-                            Ok(res) => match report_on {
-                                ReportOn::Success | ReportOn::Both => {
-                                    let message = Entry::new(
-                                        Utc::now(),
-                                        res.status().as_u16(),
-                                        target.clone(),
-                                    );
-                                    sender
-                                        .send(Ok(message.to_dto()))
-                                        .expect("Failed to send request result");
-                                }
-                                _ => (),
-                            },
-                            Err(err) => match report_on {
-                                ReportOn::Failure | ReportOn::Both => {
-                                    let message =
-                                        Failure::new(Utc::now(), err.to_string(), target.clone());
-                                    sender
-                                        .send(Err(message.to_dto()))
-                                        .expect("Failed to send request result");
-                                }
-                                _ => (),
-                            },
+                            Ok(res) => {
+                                let message =
+                                    Entry::new(Utc::now(), res.status().as_u16(), target.clone());
+                                sender
+                                    .send(Ok(message.to_dto()))
+                                    .expect("Failed to send request result");
+                            }
+                            Err(err) => {
+                                let message =
+                                    Failure::new(Utc::now(), err.to_string(), target.clone());
+                                sender
+                                    .send(Err(message.to_dto()))
+                                    .expect("Failed to send request result");
+                            }
                         }
                         currently_running.fetch_sub(1, Ordering::SeqCst);
                     });

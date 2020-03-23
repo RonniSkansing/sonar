@@ -26,14 +26,18 @@ pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
         // TODO set the capacity to be number of concurrent requests?
         let (sender, recv) = channel::<Result<EntryDTO, FailureDTO>>(100);
         receivers.push(sender.subscribe());
-        let reporter_location = target.report.location.clone();
+        let reporter_location = target.log.file.clone();
 
         tasks.push(spawn(async move {
-            debug!("Starting flat file reporter {}", reporter_location);
-            FileReporter::new(reporter_location, recv)
-                .expect("failed to create flat file reporter")
-                .listen()
-                .await;
+            if reporter_location == "" {
+                debug!("Skipping file reporter {}", reporter_location);
+            } else {
+                debug!("Starting file reporter {}", reporter_location);
+                FileReporter::new(reporter_location, recv)
+                    .expect("failed to create flat file reporter")
+                    .listen()
+                    .await;
+            }
         }));
 
         let mut requester = HttpRequester::new(client.clone(), sender);

@@ -82,11 +82,6 @@ impl SonarServer {
 
     pub async fn start(&self, receivers: Vec<Receiver<Result<EntryDTO, FailureDTO>>>) {
         self.setup_prometheus(receivers);
-
-        info!(
-            "Starting webserver on {}:{}",
-            self.config.ip, self.config.port
-        );
         let is_ip_v4 = self.config.ip.contains(".");
 
         let addr = if is_ip_v4 {
@@ -131,7 +126,7 @@ impl SonarServer {
         //self.server = Some(Server::bind(&addr).serve(make_service));
         let server = Server::bind(&addr).serve(make_service);
 
-        info!("Listening on http://{}", addr);
+        info!("Listening on http://{}/metrics", addr);
 
         if let Err(e) = server.await {
             error!("server error: {}", e);

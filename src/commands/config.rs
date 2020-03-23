@@ -43,8 +43,8 @@ pub enum ReportOn {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Report {
-    pub location: String,
+pub struct LogFile {
+    pub file: String,
     pub report_on: ReportOn,
 }
 
@@ -58,7 +58,7 @@ pub struct Target {
     pub timeout: SecondMilliDuration,
     // number of requests that can run concurrently. 2 means that up to 2 requests will be running a the same time
     pub max_concurrent: u32,
-    pub report: Report,
+    pub log: LogFile,
     // how to handle when max_concurrent and the next interval is hit.
     pub request_strategy: RequestStrategy,
 }

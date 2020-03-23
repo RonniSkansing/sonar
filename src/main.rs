@@ -77,13 +77,6 @@ fn main() {
         help: "Quiet",
     };
 
-    let no_file_output = SonarArg {
-        name: "no-file-output",
-        short: "n",
-        takes_value: &false,
-        help: "No file output",
-    };
-
     let init_command = SonarCommand {
         name: "init",
         about: "Inits a new project in the current directory",
@@ -102,12 +95,7 @@ fn main() {
         .author(sonar.author)
         .about(sonar.about)
         .subcommand(init_command.into_clap())
-        .subcommand(
-            run_command
-                .into_clap()
-                .arg(no_file_output.into_clap())
-                .arg(threads_arg.into_clap()),
-        )
+        .subcommand(run_command.into_clap().arg(threads_arg.into_clap()))
         .subcommand(
             SubCommand::with_name("autocomplete")
                 .about("Generates completion scripts for your shell")

@@ -1,5 +1,5 @@
 use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
-use crate::utils::file::Append;
+use crate::{commands::config::ReportOn, utils::file::Append};
 use log::*;
 
 use std::fs::File;
@@ -41,40 +41,44 @@ impl FileReporter {
                 Ok(result) => match result {
                     Ok(dto) => {
                         let entry = Entry::from_dto(dto);
-                        let line = format!(
-                            "{} {} {}\n",
-                            entry.time.timestamp(),
-                            entry.response_code,
-                            entry.target.url
-                        );
-
-                        info!("{}", line.trim());
-
-                        match self.file.write(line.as_bytes()) {
-                            Ok(_) => (),
-                            Err(err) => {
-                                error!("failed to write to log file: {}", err.to_string());
-                                break;
+                        match entry.target.log.report_on {
+                            ReportOn::Success | ReportOn::Both => {
+                                let line = format!(
+                                    "{} {} {}\n",
+                                    entry.time.timestamp(),
+                                    entry.response_code,
+                                    entry.target.url
+                                );
+                                match self.file.write(line.as_bytes()) {
+                                    Ok(_) => (),
+                                    Err(err) => {
+                                        error!("failed to write to log file: {}", err.to_string());
+                                        break;
+                                    }
+                                }
                             }
+                            crate::commands::config::ReportOn::Failure => (),
                         }
                     }
                     Err(dto) => {
                         let entry = Failure::from_dto(dto);
-                        let line = format!(
-                            "{} ERR {} {}\n",
-                            entry.time.timestamp(),
-                            entry.target.url,
-                            entry.reason.trim()
-                        );
-
-                        error!("{} {}", entry.target.url, entry.reason.trim());
-
-                        match self.file.write((line).as_bytes()) {
-                            Ok(_) => (),
-                            Err(err) => {
-                                error!("failed to write to log file: {}", err.to_string());
-                                break;
+                        match entry.target.log.report_on {
+                            ReportOn::Both | ReportOn::Failure => {
+                                let line = format!(
+                                    "{} ERR {} {}\n",
+                                    entry.time.timestamp(),
+                                    entry.target.url,
+                                    entry.reason.trim()
+                                );
+                                match self.file.write((line).as_bytes()) {
+                                    Ok(_) => (),
+                                    Err(err) => {
+                                        error!("failed to write to log file: {}", err.to_string());
+                                        break;
+                                    }
+                                }
                             }
+                            ReportOn::Success => (),
                         }
                     }
                 },

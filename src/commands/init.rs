@@ -1,5 +1,5 @@
 use super::config::{
-    Config, Report, ReportOn, RequestStrategy, SecondMilliDuration, ServerConfig, Target,
+    Config, LogFile, ReportOn, RequestStrategy, SecondMilliDuration, ServerConfig, Target,
 };
 use log::*;
 use std::fs::File;
@@ -14,26 +14,26 @@ pub fn execute() {
     };
     let targets = vec![
         Target {
-            name: String::from("name-example.com"),
+            name: String::from("example-com"),
             url: String::from("http://example.com"),
-            interval: SecondMilliDuration::from(Duration::from_secs(1)),
+            interval: SecondMilliDuration::from(Duration::from_secs(10)),
             max_concurrent: 2,
             timeout: SecondMilliDuration::from(Duration::from_secs(5)),
             request_strategy: RequestStrategy::Wait,
-            report: Report {
-                location: String::from("./log/name-example.com.log"),
-                report_on: ReportOn::Failure,
+            log: LogFile {
+                file: String::from("./log/name-example.com.log"),
+                report_on: ReportOn::Success,
             },
         },
         Target {
-            name: String::from("name2-www.example.com"),
-            url: String::from("www.example.com"),
-            interval: SecondMilliDuration::from(Duration::from_secs(1)),
+            name: String::from("www-example-com"),
+            url: String::from("http://example.com"),
+            interval: SecondMilliDuration::from(Duration::from_secs(10)),
             max_concurrent: 2,
             timeout: SecondMilliDuration::from(Duration::from_secs(5)),
             request_strategy: RequestStrategy::Wait,
-            report: Report {
-                location: String::from("./log/name-example.com.log"),
+            log: LogFile {
+                file: String::from("./log/name-example.com.log"),
                 report_on: ReportOn::Failure,
             },
         },
