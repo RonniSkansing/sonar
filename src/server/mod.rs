@@ -3,7 +3,7 @@ use crate::messages::{EntryDTO, FailureDTO};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Response, Server, StatusCode};
 use log::*;
-use prometheus::{Counter, Encoder, Opts, Registry, TextEncoder};
+use prometheus::{Counter, Encoder, Histogram, HistogramOpts, Opts, Registry, TextEncoder};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::net::{Ipv4Addr, Ipv6Addr};
@@ -15,12 +15,20 @@ pub struct SonarServer {
     registry: Registry,
 }
 
-fn replace_name_success(s: String) -> String {
-    (s + "_success").replace('-', "_").replace('.', "_")
+fn prometheus_normalize_name(s: String) -> String {
+    s.replace('-', "_").replace('.', "_")
 }
 
-fn replace_name_failure(s: String) -> String {
-    (s + "_failure").replace('-', "_").replace('.', "_")
+fn counter_success_name(s: String) -> String {
+    prometheus_normalize_name(s + "_success")
+}
+
+fn counter_failure_name(s: String) -> String {
+    prometheus_normalize_name(s + "_failure")
+}
+
+fn timer_name(name: String) -> String {
+    prometheus_normalize_name(name + "_time_ms")
 }
 
 impl SonarServer {
@@ -32,29 +40,57 @@ impl SonarServer {
         }
     }
 
+    // TODO move this out of the webserver
     fn setup_prometheus(&self, receivers: Vec<Receiver<Result<EntryDTO, FailureDTO>>>) {
+        let mut timers: HashMap<String, Histogram> = HashMap::new();
         let mut counters: HashMap<String, Counter> = HashMap::new();
 
         for target in &self.targets {
-            let success_name = replace_name_success(target.name.clone());
-            let failure_name = replace_name_failure(target.name.clone());
-            let success_counter_opts = Opts::new(success_name.clone(), success_name.clone());
-            let failure_counter_opts = Opts::new(failure_name.clone(), success_name.clone());
-            let success_counter =
-                Counter::with_opts(success_counter_opts).expect("unable to create success counter");
-            let failure_counter =
-                Counter::with_opts(failure_counter_opts).expect("unable to create failure counter");
+            let counter_success_name = counter_success_name(target.name.clone());
+            let counter_failure_name = counter_failure_name(target.name.clone());
+            let counter_success = Counter::with_opts(Opts::new(
+                counter_success_name.clone(),
+                String::from("Number of successful requests"),
+            ))
+            .expect("failed to create success counter");
+            let counter_failed = Counter::with_opts(Opts::new(
+                counter_failure_name.clone(),
+                String::from("Number of failed requests"),
+            ))
+            .expect("failed to create failure counter");
+            counters.insert(counter_success_name.clone(), counter_success.clone());
+            counters.insert(counter_failure_name.clone(), counter_failed.clone());
+
+            let timer_name = timer_name(target.name.clone());
+            let request_time_opts = HistogramOpts::new(
+                timer_name.clone(),
+                String::from("latency in ms"),
+                // vec![0.001, 0.50],
+            )
+            // TODO replace with bucket in target
+            .buckets(vec![
+                1.0, 10.0, 50.0, 100.0, 200.0, 400.0, 600.0, 800.0, 1000.0, 1200.0, 1400.0, 1600.0,
+                1800.0, 2000.0,
+            ]);
+            let request_time =
+                Histogram::with_opts(request_time_opts).expect("unable to create timer");
+
+            timers.insert(timer_name.clone(), request_time.clone());
+
             self.registry
-                .register(Box::new(success_counter.clone()))
-                .expect("unable to register success counter");
+                .register(Box::new(request_time))
+                .expect("unable to register timer");
             self.registry
-                .register(Box::new(failure_counter.clone()))
-                .expect("unable to register failure counter");
-            counters.insert(success_name.clone(), success_counter);
-            counters.insert(failure_name.clone(), failure_counter);
+                .register(Box::new(counter_success))
+                .expect("unable to register timer");
+            self.registry
+                .register(Box::new(counter_failed))
+                .expect("unable to register timer");
         }
 
+        // TODO optimize this, make a map of receivers and what target they are connected to.
         for mut r in receivers {
+            let timers = timers.clone();
             let counters = counters.clone();
             tokio::spawn(async move {
                 loop {
@@ -62,15 +98,23 @@ impl SonarServer {
                         Ok(m) => match m {
                             Ok(r) => {
                                 counters
-                                    .get(&replace_name_success(r.target.name))
-                                    .expect("could not find counter by name")
+                                    .get(&counter_success_name(r.target.name.clone()))
+                                    .expect("could not find success counter by key")
                                     .inc();
+                                timers
+                                    .get(&timer_name(r.target.name.clone()))
+                                    .expect("could not find timer by key")
+                                    .observe(r.latency as f64);
                             }
                             Err(err) => {
                                 counters
-                                    .get(&replace_name_failure(err.target.name))
-                                    .expect("could not find counter by name")
+                                    .get(&counter_failure_name(err.target.name.clone()))
+                                    .expect("could not find failure counter by key")
                                     .inc();
+                                timers
+                                    .get(&timer_name(err.target.name.clone()))
+                                    .expect("could not find timer by name")
+                                    .observe(err.latency as f64);
                             }
                         },
                         Err(err) => {

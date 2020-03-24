@@ -7,6 +7,7 @@ type ResponseCode = u16;
 pub struct Entry {
     pub time: DateTime<Utc>,
     pub response_code: ResponseCode,
+    pub latency: u128,
     pub target: Target,
 }
 
@@ -14,14 +15,21 @@ pub struct Entry {
 pub struct EntryDTO {
     pub timestamp_seconds: i64,
     pub response_code: ResponseCode,
+    pub latency: u128,
     pub target: Target,
 }
 
 impl Entry {
-    pub fn new(time: DateTime<Utc>, response_code: ResponseCode, target: Target) -> Entry {
+    pub fn new(
+        time: DateTime<Utc>,
+        latency: u128,
+        response_code: ResponseCode,
+        target: Target,
+    ) -> Entry {
         Entry {
             time,
             response_code,
+            latency,
             target,
         }
     }
@@ -30,6 +38,7 @@ impl Entry {
         Entry {
             time: Utc::timestamp(&Utc, dto.timestamp_seconds, 0),
             response_code: dto.response_code,
+            latency: dto.latency,
             target: dto.target,
         }
     }
@@ -38,6 +47,7 @@ impl Entry {
         EntryDTO {
             timestamp_seconds: self.time.timestamp(),
             response_code: self.response_code,
+            latency: self.latency,
             target: self.target.clone(),
         }
     }
@@ -46,6 +56,7 @@ impl Entry {
 #[derive(Debug, Clone)]
 pub struct Failure {
     pub time: DateTime<Utc>,
+    pub latency: u128,
     pub reason: String,
     pub target: Target,
 }
@@ -53,15 +64,17 @@ pub struct Failure {
 #[derive(Debug, Clone)]
 pub struct FailureDTO {
     pub timestamp_seconds: i64,
+    pub latency: u128,
     pub reason: String,
     pub target: Target,
 }
 
 impl Failure {
-    pub fn new(time: DateTime<Utc>, reason: String, target: Target) -> Failure {
+    pub fn new(time: DateTime<Utc>, latency: u128, reason: String, target: Target) -> Failure {
         Failure {
             time,
             reason,
+            latency,
             target,
         }
     }
@@ -70,6 +83,7 @@ impl Failure {
         Failure {
             time: Utc::timestamp(&Utc, dto.timestamp_seconds, 0),
             reason: dto.reason,
+            latency: dto.latency,
             target: dto.target,
         }
     }
@@ -78,6 +92,7 @@ impl Failure {
         FailureDTO {
             timestamp_seconds: self.time.timestamp(),
             reason: self.reason.clone(),
+            latency: self.latency,
             target: self.target.clone(),
         }
     }

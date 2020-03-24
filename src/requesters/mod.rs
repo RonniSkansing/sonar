@@ -9,6 +9,7 @@ pub mod http {
     use log::*;
     use reqwest::Client;
     use std::sync::atomic::{self, Ordering};
+    use std::time::Instant;
     use tokio::sync::broadcast::Sender;
 
     pub struct HttpRequester {
@@ -57,17 +58,30 @@ pub mod http {
                             .get(&target.url)
                             .timeout(DurationString::from(target.timeout.clone()).into());
 
+                        let latency = Instant::now();
                         match req.send().await {
                             Ok(res) => {
-                                let message =
-                                    Entry::new(Utc::now(), res.status().as_u16(), target.clone());
+                                let latency_millis = latency.elapsed().as_millis();
+
+                                let message = Entry::new(
+                                    Utc::now(),
+                                    latency_millis,
+                                    res.status().as_u16(),
+                                    target.clone(),
+                                );
                                 sender
                                     .send(Ok(message.to_dto()))
                                     .expect("Failed to send request result");
                             }
                             Err(err) => {
-                                let message =
-                                    Failure::new(Utc::now(), err.to_string(), target.clone());
+                                let latency_millis = latency.elapsed().as_millis();
+
+                                let message = Failure::new(
+                                    Utc::now(),
+                                    latency_millis,
+                                    err.to_string(),
+                                    target.clone(),
+                                );
                                 sender
                                     .send(Err(message.to_dto()))
                                     .expect("Failed to send request result");

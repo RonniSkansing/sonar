@@ -18,7 +18,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     ports:
-      - 4203:3000
+      - 4202:3000
     networks:
       - sonar
 
