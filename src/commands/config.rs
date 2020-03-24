@@ -1,29 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use strum_macros::Display;
-
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct SecondMilliDuration {
-    pub seconds: u64,
-    pub millis: u64,
-}
-
-impl Into<Duration> for SecondMilliDuration {
-    fn into(self) -> Duration {
-        let seconds_in_millis = self.seconds * 1000;
-        return Duration::from_millis(seconds_in_millis + self.millis);
-    }
-}
-
-impl From<Duration> for SecondMilliDuration {
-    fn from(d: Duration) -> SecondMilliDuration {
-        let duration_millis = d.as_millis();
-        let seconds = (duration_millis / 1000) as u64;
-        let millis = (duration_millis % 1000) as u64;
-
-        SecondMilliDuration { seconds, millis }
-    }
-}
 
 // The strategy determins how requesting will be processed when the requester is asked
 // to do more requests concurrently then the max.
@@ -53,9 +29,9 @@ pub struct Target {
     pub name: String,
     pub url: String,
     // how often a request should happen
-    pub interval: SecondMilliDuration,
+    pub interval: String,
     // if a request hits the timeout it is canceled
-    pub timeout: SecondMilliDuration,
+    pub timeout: String,
     // number of requests that can run concurrently. 2 means that up to 2 requests will be running a the same time
     pub max_concurrent: u32,
     pub log: LogFile,
@@ -73,28 +49,4 @@ pub struct ServerConfig {
 pub struct Config {
     pub server: ServerConfig,
     pub targets: Vec<Target>,
-}
-
-#[cfg(test)]
-mod tests {
-    mod config_duration {
-        use super::super::*;
-
-        #[test]
-        fn test_into_duration() {
-            let cd: Duration = SecondMilliDuration {
-                seconds: 4,
-                millis: 1200,
-            }
-            .into();
-            assert_eq!(5200, cd.as_millis());
-        }
-
-        #[test]
-        fn test_from_duration() {
-            let d = Duration::from_millis(4210);
-            let i = SecondMilliDuration::from(d);
-            assert_eq!((4, 210), (i.seconds, i.millis));
-        }
-    }
 }

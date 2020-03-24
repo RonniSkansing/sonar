@@ -1,11 +1,8 @@
-use super::config::{
-    Config, LogFile, ReportOn, RequestStrategy, SecondMilliDuration, ServerConfig, Target,
-};
+use super::config::{Config, LogFile, ReportOn, RequestStrategy, ServerConfig, Target};
 use log::*;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use std::time::Duration;
 
 pub fn execute() {
     let server = ServerConfig {
@@ -16,9 +13,9 @@ pub fn execute() {
         Target {
             name: String::from("example-com"),
             url: String::from("http://example.com"),
-            interval: SecondMilliDuration::from(Duration::from_secs(10)),
+            interval: String::from("1s"),
             max_concurrent: 2,
-            timeout: SecondMilliDuration::from(Duration::from_secs(5)),
+            timeout: String::from("5s"),
             request_strategy: RequestStrategy::Wait,
             log: LogFile {
                 file: String::from("./log/name-example.com.log"),
@@ -28,9 +25,9 @@ pub fn execute() {
         Target {
             name: String::from("www-example-com"),
             url: String::from("http://example.com"),
-            interval: SecondMilliDuration::from(Duration::from_secs(10)),
+            interval: String::from("2s"),
             max_concurrent: 2,
-            timeout: SecondMilliDuration::from(Duration::from_secs(5)),
+            timeout: String::from("5s"),
             request_strategy: RequestStrategy::Wait,
             log: LogFile {
                 file: String::from("./log/name-example.com.log"),

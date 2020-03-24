@@ -1,6 +1,9 @@
 pub mod http {
     use crate::commands::config::{RequestStrategy, Target};
-    use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
+    use crate::{
+        messages::{Entry, EntryDTO, Failure, FailureDTO},
+        utils::time::DurationString,
+    };
     use atomic::AtomicU32;
     use chrono::Utc;
     use log::*;
@@ -26,7 +29,8 @@ pub mod http {
                 "Starting requester for {} with strategy {}",
                 target.url, target.request_strategy
             );
-            let mut interval = tokio::time::interval(target.interval.into());
+            let mut interval =
+                tokio::time::interval(DurationString::from(target.interval.clone()).into());
             interval.tick().await;
             let currently_running = std::sync::Arc::from(AtomicU32::new(0));
             match target.request_strategy {
@@ -49,7 +53,9 @@ pub mod http {
                     let target = target.clone();
                     let currently_running = currently_running.clone();
                     tokio::spawn(async move {
-                        let req = client.get(&target.url).timeout(target.timeout.into());
+                        let req = client
+                            .get(&target.url)
+                            .timeout(DurationString::from(target.timeout.clone()).into());
 
                         match req.send().await {
                             Ok(res) => {
