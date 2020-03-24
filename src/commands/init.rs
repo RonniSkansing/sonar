@@ -6,7 +6,7 @@ use std::path::Path;
 
 pub fn execute() {
     let server = ServerConfig {
-        ip: String::from("127.0.0.1"),
+        ip: String::from("0.0.0.0"),
         port: 8080,
     };
     let targets = vec![

@@ -5,21 +5,22 @@ services:
     build: .
     networks:
       - sonar
-    volumes:
-      - prometheus-config:/opt/sonar/prometheus
     ports:
-      - 8080:8080
+      - 4200:8080
   prometheus:
     volumes:
-      - prometheus/etc/prometheus/
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
     image: prom/prometheus:latest
     ports:
-      - 9090:9090
+      - 4201:9090
     networks:
       - sonar
-
-volumes:
-  prometheus-config:
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - 4203:3000
+    networks:
+      - sonar
 
 networks:
   sonar:
