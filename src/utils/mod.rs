@@ -100,10 +100,9 @@ pub mod time {
 #[cfg(test)]
 mod tests {
     mod time {
-        // use super::super::time::duration_string_to_duration;
-        use std::time::Duration;
+        // use std::time::Duration;
         /* #[test]
-        fn test_duration_string_to_duration() {
+        fn foo() {
             let hundred_millis = "100ms";
             let hundred_millis_duration =
                 duration_string_to_duration(hundred_millis.to_string()).unwrap();
