@@ -1,0 +1,25 @@
+# example file for building sonar with prometheus and grafana
+version: "3.0"
+services:
+  sonar:
+    build: .
+    networks:
+      - sonar
+    volumes:
+      - prometheus-config:/opt/sonar/prometheus
+    ports:
+      - 8080:8080
+  prometheus:
+    volumes:
+      - prometheus/etc/prometheus/
+    image: prom/prometheus:latest
+    ports:
+      - 9090:9090
+    networks:
+      - sonar
+
+volumes:
+  prometheus-config:
+
+networks:
+  sonar:

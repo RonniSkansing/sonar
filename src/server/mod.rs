@@ -40,14 +40,16 @@ impl SonarServer {
             let failure_name = replace_name_failure(target.name.clone());
             let success_counter_opts = Opts::new(success_name.clone(), success_name.clone());
             let failure_counter_opts = Opts::new(failure_name.clone(), success_name.clone());
-            let success_counter = Counter::with_opts(success_counter_opts).unwrap();
-            let failure_counter = Counter::with_opts(failure_counter_opts).unwrap();
+            let success_counter =
+                Counter::with_opts(success_counter_opts).expect("unable to create success counter");
+            let failure_counter =
+                Counter::with_opts(failure_counter_opts).expect("unable to create failure counter");
             self.registry
                 .register(Box::new(success_counter.clone()))
-                .unwrap();
+                .expect("unable to register success counter");
             self.registry
                 .register(Box::new(failure_counter.clone()))
-                .unwrap();
+                .expect("unable to register failure counter");
             counters.insert(success_name.clone(), success_counter);
             counters.insert(failure_name.clone(), failure_counter);
         }
@@ -112,7 +114,9 @@ impl SonarServer {
                         if req.uri().path() == "/metrics" {
                             let mut buffer = vec![];
                             let encoder = TextEncoder::new();
-                            encoder.encode(&metric_families, &mut buffer).unwrap();
+                            encoder
+                                .encode(&metric_families, &mut buffer)
+                                .expect("unable to put metrics in buffer");
                             *response.body_mut() = Body::from(buffer);
                         } else {
                             *response.status_mut() = StatusCode::NOT_FOUND;

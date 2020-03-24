@@ -91,6 +91,7 @@ fn main() {
 
     let app = App::new(sonar.name)
         .arg(debug_arg.into_clap())
+        .arg(quiet_arg.into_clap())
         .version(sonar.version)
         .author(sonar.author)
         .about(sonar.about)
@@ -114,7 +115,7 @@ fn main() {
     // config debug
     let is_debug = matches.is_present(debug_arg.name);
     if is_debug {
-        std::env::set_var("RUST_BACKTRACE", "1");
+        std::env::set_var("RUST_BACKTRACE", "full");
     }
 
     // setup logger
@@ -132,7 +133,10 @@ fn main() {
             LevelFilter::Info
         };
 
-        loggers.push(TermLogger::new(filter, config.clone(), TerminalMode::Mixed).unwrap());
+        match TermLogger::new(filter, config.clone(), TerminalMode::Mixed) {
+            Some(logger) => loggers.push(logger),
+            None => loggers.push(SimpleLogger::new(filter, config.clone())),
+        }
     }
 
     let _ = CombinedLogger::init(loggers).expect("Failed to setup logger");
@@ -170,7 +174,11 @@ fn main() {
                 });
         }
         ("autocomplete", Some(sub_matches)) => {
-            let shell: Shell = sub_matches.value_of("SHELL").unwrap().parse().unwrap();
+            let shell: Shell = sub_matches
+                .value_of("SHELL")
+                .expect("unable to get value of SHELL")
+                .parse()
+                .expect("unable to match SHELL");
             app_clone.gen_completions_to("sonar", shell, &mut std::io::stdout());
         }
         (_, _) => {
