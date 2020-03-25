@@ -62,7 +62,6 @@ pub mod http {
                         match req.send().await {
                             Ok(res) => {
                                 let latency_millis = latency.elapsed().as_millis();
-
                                 let message = Entry::new(
                                     Utc::now(),
                                     latency_millis,

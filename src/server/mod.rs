@@ -23,10 +23,6 @@ fn counter_success_name(s: String) -> String {
     prometheus_normalize_name(s + "_success")
 }
 
-fn counter_failure_name(s: String) -> String {
-    prometheus_normalize_name(s + "_failure")
-}
-
 fn timer_name(name: String) -> String {
     prometheus_normalize_name(name + "_time_ms")
 }
@@ -47,31 +43,21 @@ impl SonarServer {
 
         for target in &self.targets {
             let counter_success_name = counter_success_name(target.name.clone());
-            let counter_failure_name = counter_failure_name(target.name.clone());
             let counter_success = Counter::with_opts(Opts::new(
                 counter_success_name.clone(),
                 String::from("Number of successful requests"),
             ))
             .expect("failed to create success counter");
-            let counter_failed = Counter::with_opts(Opts::new(
-                counter_failure_name.clone(),
-                String::from("Number of failed requests"),
-            ))
-            .expect("failed to create failure counter");
             counters.insert(counter_success_name.clone(), counter_success.clone());
-            counters.insert(counter_failure_name.clone(), counter_failed.clone());
 
             let timer_name = timer_name(target.name.clone());
-            let request_time_opts = HistogramOpts::new(
-                timer_name.clone(),
-                String::from("latency in ms"),
-                // vec![0.001, 0.50],
-            )
-            // TODO replace with bucket in target
-            .buckets(vec![
-                1.0, 10.0, 50.0, 100.0, 200.0, 400.0, 600.0, 800.0, 1000.0, 1200.0, 1400.0, 1600.0,
-                1800.0, 2000.0,
-            ]);
+            let request_time_opts =
+                HistogramOpts::new(timer_name.clone(), String::from("latency in ms"))
+                    // TODO replace with bucket in target
+                    .buckets(vec![
+                        1.0, 10.0, 50.0, 100.0, 200.0, 400.0, 600.0, 800.0, 1000.0, 1200.0, 1400.0,
+                        1600.0, 1800.0, 2000.0,
+                    ]);
             let request_time =
                 Histogram::with_opts(request_time_opts).expect("unable to create timer");
 
@@ -82,9 +68,6 @@ impl SonarServer {
                 .expect("unable to register timer");
             self.registry
                 .register(Box::new(counter_success))
-                .expect("unable to register timer");
-            self.registry
-                .register(Box::new(counter_failed))
                 .expect("unable to register timer");
         }
 
@@ -107,10 +90,6 @@ impl SonarServer {
                                     .observe(r.latency as f64);
                             }
                             Err(err) => {
-                                counters
-                                    .get(&counter_failure_name(err.target.name.clone()))
-                                    .expect("could not find failure counter by key")
-                                    .inc();
                                 timers
                                     .get(&timer_name(err.target.name.clone()))
                                     .expect("could not find timer by name")
