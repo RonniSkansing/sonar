@@ -20,8 +20,27 @@ pub enum ReportOn {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LogFile {
+    #[serde(default = "LogFile::default_file")]
     pub file: String,
+    #[serde(default = "LogFile::default_report_on")]
     pub report_on: ReportOn,
+}
+
+impl LogFile {
+    fn default() -> Self {
+        LogFile {
+            file: Self::default_file(),
+            report_on: Self::default_report_on(),
+        }
+    }
+    // default to an empty string which equals no logging
+    fn default_file() -> String {
+        String::from("")
+    }
+
+    fn default_report_on() -> ReportOn {
+        ReportOn::Failure
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -29,14 +48,38 @@ pub struct Target {
     pub name: String,
     pub url: String,
     // how often a request should happen
+    #[serde(default = "Target::default_interval")]
     pub interval: String,
     // if a request hits the timeout it is canceled
+    #[serde(default = "Target::default_timeout")]
     pub timeout: String,
     // number of requests that can run concurrently. 2 means that up to 2 requests will be running a the same time
+    #[serde(default = "Target::default_concurrent")]
     pub max_concurrent: u32,
+    #[serde(default = "LogFile::default")]
     pub log: LogFile,
     // how to handle when max_concurrent and the next interval is hit.
+    #[serde(default = "Target::default_strategy")]
     pub request_strategy: RequestStrategy,
+}
+
+impl Target {
+    fn default_strategy() -> RequestStrategy {
+        // println!("{}", self.name);
+        RequestStrategy::Wait
+    }
+
+    fn default_timeout() -> String {
+        String::from("5s")
+    }
+
+    fn default_interval() -> String {
+        String::from("1m")
+    }
+
+    fn default_concurrent() -> u32 {
+        1
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
