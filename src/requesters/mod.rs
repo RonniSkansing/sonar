@@ -1,11 +1,9 @@
 pub mod http {
     use crate::commands::config::{RequestStrategy, Target};
-    use crate::{
-        messages::{Entry, EntryDTO, Failure, FailureDTO},
-        utils::time::DurationString,
-    };
+    use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
     use atomic::AtomicU32;
     use chrono::Utc;
+    use duration_string::DurationString;
     use log::*;
     use reqwest::Client;
     use std::sync::atomic::{self, Ordering};

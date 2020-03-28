@@ -1,3 +1,4 @@
+use duration_string::DurationString;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
@@ -49,10 +50,10 @@ pub struct Target {
     pub url: String,
     // how often a request should happen
     #[serde(default = "Target::default_interval")]
-    pub interval: String,
+    pub interval: DurationString,
     // if a request hits the timeout it is canceled
     #[serde(default = "Target::default_timeout")]
-    pub timeout: String,
+    pub timeout: DurationString,
     // number of requests that can run concurrently. 2 means that up to 2 requests will be running a the same time
     #[serde(default = "Target::default_concurrent")]
     pub max_concurrent: u32,
@@ -65,16 +66,17 @@ pub struct Target {
 
 impl Target {
     fn default_strategy() -> RequestStrategy {
-        // println!("{}", self.name);
         RequestStrategy::Wait
     }
 
-    fn default_timeout() -> String {
-        String::from("5s")
+    fn default_timeout() -> DurationString {
+        DurationString::from_string(String::from("5s"))
+            .expect("failed to create from duration string")
     }
 
-    fn default_interval() -> String {
-        String::from("1m")
+    fn default_interval() -> DurationString {
+        DurationString::from_string(String::from("1m"))
+            .expect("failed to create from duration string")
     }
 
     fn default_concurrent() -> u32 {

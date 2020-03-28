@@ -1,4 +1,5 @@
 use super::config::{Config, LogFile, ReportOn, RequestStrategy, ServerConfig, Target};
+use duration_string::DurationString;
 use log::*;
 use std::fs::File;
 use std::io::prelude::*;
@@ -13,9 +14,11 @@ pub fn execute() {
         Target {
             name: String::from("example-com"),
             url: String::from("http://example.com"),
-            interval: String::from("1s"),
+            interval: DurationString::from_string(String::from("1s"))
+                .expect("could not create duration string"),
             max_concurrent: 2,
-            timeout: String::from("5s"),
+            timeout: DurationString::from_string(String::from("5s"))
+                .expect("could not create duration string"),
             request_strategy: RequestStrategy::Wait,
             log: LogFile {
                 file: String::from("./log/name-example.com.log"),
@@ -25,9 +28,11 @@ pub fn execute() {
         Target {
             name: String::from("www-example-com"),
             url: String::from("http://example.com"),
-            interval: String::from("2s"),
+            interval: DurationString::from_string(String::from("2s"))
+                .expect("could not create duration string"),
             max_concurrent: 2,
-            timeout: String::from("5s"),
+            timeout: DurationString::from_string(String::from("5s"))
+                .expect("could not create duration string"),
             request_strategy: RequestStrategy::Wait,
             log: LogFile {
                 file: String::from("./log/name-example.com.log"),
