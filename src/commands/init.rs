@@ -1,4 +1,4 @@
-use super::config::{Config, LogFile, ReportOn, RequestStrategy, ServerConfig, Target};
+use crate::config::{Config, LogFile, ReportOn, RequestStrategy, ServerConfig, Target};
 use duration_string::DurationString;
 use log::*;
 use std::fs::File;

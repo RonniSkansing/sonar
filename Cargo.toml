@@ -21,3 +21,4 @@ log = "0.4.8"
 hyper = "0.13.4"
 prometheus = "0.8.0"
 duration-string = { version = "0.0.6", features = ["serde"] }
+grafana-dashboard = "0.0.0"

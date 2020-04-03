@@ -1,5 +1,5 @@
 pub mod http {
-    use crate::commands::config::{RequestStrategy, Target};
+    use crate::config::{RequestStrategy, Target};
     use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
     use atomic::AtomicU32;
     use chrono::Utc;

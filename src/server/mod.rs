@@ -1,4 +1,4 @@
-use crate::commands::config::{ServerConfig, Target};
+use crate::config::{ServerConfig, Target};
 use crate::messages::{EntryDTO, FailureDTO};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Response, Server, StatusCode};

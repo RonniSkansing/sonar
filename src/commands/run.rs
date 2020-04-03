@@ -1,4 +1,4 @@
-use super::config::Config;
+use crate::config::Config;
 use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporter;
 use crate::{requesters::http::HttpRequester, server::SonarServer};

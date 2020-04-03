@@ -1,5 +1,5 @@
 use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
-use crate::{commands::config::ReportOn, utils::file::Append};
+use crate::{config::ReportOn, utils::file::Append};
 use log::*;
 
 use std::fs::File;
@@ -57,7 +57,7 @@ impl FileReporter {
                                     }
                                 }
                             }
-                            crate::commands::config::ReportOn::Failure => (),
+                            ReportOn::Failure => (),
                         }
                     }
                     Err(dto) => {

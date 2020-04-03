@@ -1,4 +1,4 @@
-use crate::commands::config::Target;
+use crate::config::Target;
 use chrono::{DateTime, TimeZone, Utc};
 
 type ResponseCode = u16;

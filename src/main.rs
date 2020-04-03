@@ -1,4 +1,5 @@
 mod commands;
+mod config;
 mod messages;
 mod reporters;
 mod requesters;

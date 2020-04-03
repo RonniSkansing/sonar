@@ -351,6 +351,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "grafana-dashboard"
+version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "518785e8bd8477398a1ab351a851935adb154b4b777aab00fe1e68e78f4c9d03"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "h2"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1089,6 +1098,7 @@ dependencies = [
  "clap",
  "duration-string",
  "futures",
+ "grafana-dashboard",
  "hyper",
  "log",
  "prometheus",
