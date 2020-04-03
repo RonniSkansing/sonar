@@ -3,5 +3,4 @@
 /target
 /sonar.yaml
 /log
-/grafana/dashboard.json
 /grafana/dashboard_target.json
