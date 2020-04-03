@@ -352,9 +352,9 @@ dependencies = [
 
 [[package]]
 name = "grafana-dashboard"
-version = "0.0.0"
+version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "518785e8bd8477398a1ab351a851935adb154b4b777aab00fe1e68e78f4c9d03"
+checksum = "8c2e130f333f58e0ec8eea59db4d6c39a563af3647151ccdd15b6f2f180e6bc3"
 dependencies = [
  "serde",
 ]
@@ -1012,9 +1012,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.45"
+version = "1.0.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eab8f15f15d6c41a154c1b128a22f2dfabe350ef53c40953d84e36155c91192b"
+checksum = "78a7a12c167809363ec3bd7329fc0a3369056996de43c4b37ef3cd54a6ce4867"
 dependencies = [
  "itoa",
  "ryu",
@@ -1104,6 +1104,7 @@ dependencies = [
  "prometheus",
  "reqwest",
  "serde",
+ "serde_json",
  "serde_yaml",
  "simplelog",
  "strum",

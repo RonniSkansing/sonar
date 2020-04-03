@@ -15,7 +15,7 @@ pub struct SonarServer {
     registry: Registry,
 }
 
-fn prometheus_normalize_name(s: String) -> String {
+pub fn prometheus_normalize_name(s: String) -> String {
     s.replace('-', "_").replace('.', "_")
 }
 

@@ -27,7 +27,7 @@ services:
       - ./grafana/datasource.yaml:/etc/grafana/provisioning/datasources/sonar-prometheus.yaml
       - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/sonar.yaml
       - sonar-grafana-dashboards:/var/lib/grafana/dashboards/
-      - ./grafana/dashboard.json:/var/lib/grafana/dashboards/sonar.json
+      # - ./grafana/dashboard.json:/var/lib/grafana/dashboards/sonar.json
     ports:
       - 4202:3000
     networks:

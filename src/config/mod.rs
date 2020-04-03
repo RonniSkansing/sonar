@@ -2,6 +2,8 @@ use duration_string::DurationString;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
+pub mod grafana;
+
 // The strategy determins how requesting will be processed when the requester is asked
 // to do more requests concurrently then the max.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
