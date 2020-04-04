@@ -71,6 +71,13 @@ fn main() {
         help: "Max number of threads. The default value is the number of cores available to the system.",
     };
 
+    let config_arg = SonarArg {
+        name: "config",
+        short: "c",
+        takes_value: &true,
+        help: "Config file. Example -> sonar run -c ./foo/bar/baz.yaml",
+    };
+
     let quiet_arg = SonarArg {
         name: "quiet",
         short: "q",
@@ -97,7 +104,12 @@ fn main() {
         .author(sonar.author)
         .about(sonar.about)
         .subcommand(init_command.into_clap())
-        .subcommand(run_command.into_clap().arg(threads_arg.into_clap()))
+        .subcommand(
+            run_command
+                .into_clap()
+                .arg(threads_arg.into_clap())
+                .arg(config_arg.into_clap()),
+        )
         .subcommand(
             SubCommand::with_name("autocomplete")
                 .about("Generates completion scripts for your shell")
@@ -142,34 +154,53 @@ fn main() {
 
     let _ = CombinedLogger::init(loggers).expect("Failed to setup logger");
 
-    // setup http(s) client
-    let client: Client = Client::new();
-
-    // setup runtime
-    let mut runtime_builder = runtime::Builder::new();
-    if matches.is_present(threads_arg.name) {
-        let n: usize = matches
-            .value_of(threads_arg.name)
-            .expect("failed to get threads argument")
-            .parse()
-            .expect("failed to parse threads argument - invalid format");
-        runtime_builder.max_threads(n);
-        debug!("Thread pool set to {}", n);
-    }
-
-    let mut runtime = runtime_builder
-        .thread_name("sonar-pool")
-        .threaded_scheduler()
-        .enable_all()
-        .build()
-        .expect("Failed to build runtime");
-
     // run command
     match matches.subcommand() {
         (name, Some(_)) if name == init_command.name => commands::init::execute(),
         (name, Some(_)) if name == run_command.name => {
+            let subcommand_matches = matches
+                .subcommand_matches(run_command.name)
+                .expect("Could not get run command arguments");
+            println!("{:?}", subcommand_matches.args.get(threads_arg.name));
+
+            // setup runtime
+            let mut runtime_builder = runtime::Builder::new();
+            let threads_arg_match = subcommand_matches.args.get(threads_arg.name);
+            if threads_arg_match.is_some() {
+                let v = threads_arg_match.unwrap();
+                let n: usize = v.vals[0]
+                    .clone()
+                    .into_string()
+                    .expect("failed to take osstring into string")
+                    .parse()
+                    .expect("failed to parse thread number to usize");
+                runtime_builder.max_threads(n);
+                debug!("Thread pool set to {}", n);
+            }
+            let mut runtime = runtime_builder
+                .thread_name("sonar-pool")
+                .threaded_scheduler()
+                .enable_all()
+                .build()
+                .expect("Failed to build runtime");
+
+            let default_config_path_match = subcommand_matches.args.get(config_arg.name);
+            let default_config_path = if default_config_path_match.is_some() {
+                let v = default_config_path_match.expect("failed to get default_config_path match");
+                v.vals[0]
+                    .clone()
+                    .into_string()
+                    .expect("failed to take cconfig_path osstring into string")
+            } else {
+                "./sonar.yaml".to_string()
+            };
+            debug!("path: {}", default_config_path);
+
             runtime
-                .block_on(commands::run::execute(client))
+                .block_on(commands::run::execute(
+                    default_config_path.as_str(),
+                    Client::new(),
+                ))
                 .unwrap_or_else(|e| {
                     error!("Failed to run {}", e.to_string());
                 });

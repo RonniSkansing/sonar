@@ -3,7 +3,6 @@ WORKDIR /usr/src/sonar
 COPY ./ .
 RUN cargo install --debug --path .
 
-
 FROM debian:buster-slim
 RUN apt update -y && apt install openssl -y
 WORKDIR "/opt/sonar/" 

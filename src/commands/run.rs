@@ -13,8 +13,9 @@ use tokio::spawn;
 use tokio::sync::broadcast::channel;
 use tokio::task::JoinHandle;
 
-pub async fn execute<'a>(client: Client) -> Result<(), Box<dyn Error>> {
-    let config_str = read_to_string("./sonar.yaml")?;
+pub async fn execute<'a>(config_path: &str, client: Client) -> Result<(), Box<dyn Error>> {
+    debug!("Loading config from: {}", config_path);
+    let config_str = read_to_string(config_path)?;
     let config: Config = serde_yaml::from_str(&config_str)?;
     let server_config = config.server.clone();
     let config_targets = config.targets.clone();

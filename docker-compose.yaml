@@ -5,6 +5,7 @@ services:
     build: .
     volumes:
       - sonar-grafana-dashboards:/opt/sonar/dashboards
+      # - sonar-local-volume:/opt/sonar/sonar.yaml
     networks:
       - sonar
     ports:
@@ -27,7 +28,6 @@ services:
       - ./grafana/datasource.yaml:/etc/grafana/provisioning/datasources/sonar-prometheus.yaml
       - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/sonar.yaml
       - sonar-grafana-dashboards:/var/lib/grafana/dashboards/
-      # - ./grafana/dashboard.json:/var/lib/grafana/dashboards/sonar.json
     ports:
       - 4202:3000
     networks:
@@ -38,3 +38,9 @@ networks:
 
 volumes:
   sonar-grafana-dashboards:
+  sonar-local-volume:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${PWD}/local-volume
