@@ -4,3 +4,4 @@
 /sonar.yaml
 /log
 /grafana/dashboard_target.json
+/docker-compose/volume
