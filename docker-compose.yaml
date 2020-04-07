@@ -5,7 +5,7 @@ services:
     build: .
     volumes:
       - sonar-grafana-dashboards:/opt/sonar/dashboards
-      # - sonar-local-volume:/opt/sonar/sonar.yaml
+      - sonar-local-volume:/opt/sonar/local-mount
     networks:
       - sonar
     ports:
@@ -43,4 +43,4 @@ volumes:
     driver_opts:
       o: bind
       type: none
-      device: ${PWD}/local-volume
+      device: ${PWD}/docker-compose/volume

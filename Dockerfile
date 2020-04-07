@@ -5,8 +5,8 @@ RUN cargo install --debug --path .
 
 FROM debian:buster-slim
 RUN apt update -y && apt install openssl -y
-WORKDIR "/opt/sonar/" 
+WORKDIR "/opt/sonar/local-mount" 
 COPY --from=builder /usr/local/cargo/bin/sonar /usr/local/bin/sonar
-RUN mkdir -p /opt/sonar/dashboards/
-RUN sonar init
-CMD ["sonar", "run"]
+RUN mkdir -p /opt/sonar/dashboards/ && mkdir -p /opt/sonar/local-mount
+
+CMD ["bash", "/opt/sonar/local-mount/start.sh"]

@@ -157,11 +157,12 @@ fn main() {
     // run command
     match matches.subcommand() {
         (name, Some(_)) if name == init_command.name => commands::init::execute(),
+
+        // TODO use Some(submatches) instead of manually pulling out of subcommand_matches
         (name, Some(_)) if name == run_command.name => {
             let subcommand_matches = matches
                 .subcommand_matches(run_command.name)
                 .expect("Could not get run command arguments");
-            println!("{:?}", subcommand_matches.args.get(threads_arg.name));
 
             // setup runtime
             let mut runtime_builder = runtime::Builder::new();
@@ -194,7 +195,7 @@ fn main() {
             } else {
                 "./sonar.yaml".to_string()
             };
-            debug!("path: {}", default_config_path);
+            debug!("config path: {}", default_config_path);
 
             runtime
                 .block_on(commands::run::execute(
