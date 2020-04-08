@@ -94,20 +94,13 @@ pub struct ServerConfig {
 
 //
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ReportingConfig {
-    pub r#type: ReportType,
-    pub path: Option<String>,
+pub struct GrafanaConfig {
+    pub dashboard_path: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
-pub enum ReportType {
-    Grafana,
-    // Both, TODO - move global Log config here
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
     pub server: ServerConfig,
-    pub reporting: Vec<ReportingConfig>,
+    pub grafana: Option<GrafanaConfig>,
     pub targets: Vec<Target>,
 }

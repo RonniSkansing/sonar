@@ -1,5 +1,5 @@
 use crate::config::{
-    Config, LogFile, ReportOn, ReportType, ReportingConfig, RequestStrategy, ServerConfig, Target,
+    Config, GrafanaConfig, LogFile, ReportOn, RequestStrategy, ServerConfig, Target,
 };
 use duration_string::DurationString;
 use log::*;
@@ -12,9 +12,9 @@ pub fn execute() {
         ip: String::from("0.0.0.0"),
         port: 8080,
     };
-    let grafana_reporting = ReportingConfig {
-        r#type: ReportType::Grafana,
-        path: Some("/opt/sonar/dashboards/sonar.json".to_string()),
+    let grafana_config = GrafanaConfig {
+        // TODO make the path default to ./sonar-dashboard.json
+        dashboard_path: "/opt/sonar/dashboards/sonar.json".to_string(),
     };
     let targets = vec![
         Target {
@@ -49,7 +49,7 @@ pub fn execute() {
 
     let default_config = serde_yaml::to_string(&Config {
         server,
-        reporting: [grafana_reporting].to_vec(),
+        grafana: Some(grafana_config),
         targets,
     })
     .expect("unexpected invalid yaml");
