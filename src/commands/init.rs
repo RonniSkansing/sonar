@@ -1,4 +1,6 @@
-use crate::config::{Config, LogFile, ReportOn, RequestStrategy, ServerConfig, Target};
+use crate::config::{
+    Config, LogFile, ReportOn, ReportType, ReportingConfig, RequestStrategy, ServerConfig, Target,
+};
 use duration_string::DurationString;
 use log::*;
 use std::fs::File;
@@ -9,6 +11,10 @@ pub fn execute() {
     let server = ServerConfig {
         ip: String::from("0.0.0.0"),
         port: 8080,
+    };
+    let grafana_reporting = ReportingConfig {
+        r#type: ReportType::Grafana,
+        path: Some("/opt/sonar/dashboards/sonar.json".to_string()),
     };
     let targets = vec![
         Target {
@@ -41,8 +47,12 @@ pub fn execute() {
         },
     ];
 
-    let default_config =
-        serde_yaml::to_string(&Config { server, targets }).expect("unexpected invalid yaml");
+    let default_config = serde_yaml::to_string(&Config {
+        server,
+        reporting: [grafana_reporting].to_vec(),
+        targets,
+    })
+    .expect("unexpected invalid yaml");
 
     let config_file_name = "./sonar.yaml";
     let path = Path::new(config_file_name);

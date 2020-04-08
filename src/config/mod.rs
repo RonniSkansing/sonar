@@ -92,8 +92,22 @@ pub struct ServerConfig {
     pub ip: String,
 }
 
+//
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ReportingConfig {
+    pub r#type: ReportType,
+    pub path: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
+pub enum ReportType {
+    Grafana,
+    // Both, TODO - move global Log config here
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
     pub server: ServerConfig,
+    pub reporting: Vec<ReportingConfig>,
     pub targets: Vec<Target>,
 }

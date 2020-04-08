@@ -1,4 +1,4 @@
-use crate::config::{grafana::to_prometheus_grafana, Config};
+use crate::config::{grafana::to_prometheus_grafana, Config, ReportType};
 use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporter;
 use crate::{requesters::http::HttpRequester, server::SonarServer};
@@ -22,13 +22,19 @@ pub async fn execute<'a>(config_path: &str, client: Client) -> Result<(), Box<dy
     let mut tasks: Vec<JoinHandle<_>> = vec![];
 
     let mut receivers = vec![];
-
-    // TODO add dashboard path to config
-    // opt/sonar/dashboards
-    File::create("/opt/sonar/dashboards/sonar.json")
-        .expect("failed to create grafana dashboard.json file")
-        .write_all(to_prometheus_grafana(&config).as_bytes())
-        .expect("failed to write dashboard json to file");
+    for report in &config.reporting {
+        match report.r#type {
+            ReportType::Grafana => File::create(
+                report
+                    .path
+                    .clone()
+                    .expect("missing path for grafana dashboards"),
+            )
+            .expect("failed to create grafana dashboard.json file")
+            .write_all(to_prometheus_grafana(&config).as_bytes())
+            .expect("failed to write dashboard json to file"),
+        }
+    }
 
     // TODO send a start signal to all requesters when everything is ready so we do not loose requests
     for target in config.targets {
