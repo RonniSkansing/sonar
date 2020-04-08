@@ -100,7 +100,7 @@ pub struct GrafanaConfig {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
-    pub server: ServerConfig,
+    pub server: Option<ServerConfig>,
     pub grafana: Option<GrafanaConfig>,
     pub targets: Vec<Target>,
 }

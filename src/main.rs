@@ -1,3 +1,17 @@
+//!### Internal Event Flow
+//!
+//!- Sonar started
+//!
+//!  - Event: Config created/changed/deleted
+//!    - Job: Create new grafana dashboard
+//!      - 3.Party: Grafana reads new dashboard
+//!    - Job: Change Grafana Metrics exporter
+//!    - Job: Stop / Start / Change Requesters
+//!
+//!- Event: Requester completed/failed request
+//!  - Job: Logger writes to log file
+//!  - Job: Grafana metrics added to exporter client
+
 mod commands;
 mod config;
 mod messages;
@@ -10,6 +24,7 @@ use clap::{App, Arg, Shell, SubCommand};
 use log::*;
 use reqwest::Client;
 use simplelog::*;
+use std::path::PathBuf;
 use tokio::runtime;
 
 struct Application<'a> {
@@ -54,7 +69,7 @@ fn main() {
         name: "Sonar",
         author: "",
         version: "0.0.0",
-        about: "Portable Surveillance and monitoring",
+        about: "Portable monitoring",
     };
 
     let debug_arg = SonarArg {
@@ -156,6 +171,7 @@ fn main() {
 
     // run command
     match matches.subcommand() {
+        // TODO add arg --grafana -g to add the grafana dashboard path, default to ./sonar.json
         (name, Some(_)) if name == init_command.name => commands::init::execute(),
 
         // TODO use Some(submatches) instead of manually pulling out of subcommand_matches
@@ -199,7 +215,7 @@ fn main() {
 
             runtime
                 .block_on(commands::run::execute(
-                    default_config_path.as_str(),
+                    PathBuf::from(default_config_path.clone()),
                     Client::new(),
                 ))
                 .unwrap_or_else(|e| {

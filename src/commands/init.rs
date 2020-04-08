@@ -8,10 +8,10 @@ use std::io::prelude::*;
 use std::path::Path;
 
 pub fn execute() {
-    let server = ServerConfig {
+    let server = Some(ServerConfig {
         ip: String::from("0.0.0.0"),
         port: 8080,
-    };
+    });
     let grafana_config = GrafanaConfig {
         // TODO make the path default to ./sonar-dashboard.json
         dashboard_path: "/opt/sonar/dashboards/sonar.json".to_string(),

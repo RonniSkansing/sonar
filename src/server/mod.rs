@@ -7,12 +7,13 @@ use prometheus::{Counter, Encoder, Histogram, HistogramOpts, Opts, Registry, Tex
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::net::{Ipv4Addr, Ipv6Addr};
-use tokio::sync::broadcast::Receiver;
+use tokio::sync::{broadcast::Receiver, oneshot};
 
 pub struct SonarServer {
     config: ServerConfig,
     targets: Vec<Target>,
     registry: Registry,
+    shutdownSender: Option<oneshot::Sender<()>>,
 }
 
 pub fn prometheus_normalize_name(s: String) -> String {
@@ -33,11 +34,13 @@ impl SonarServer {
             config,
             targets,
             registry: Registry::new(),
+            shutdownSender: None,
         }
     }
 
     // TODO move this out of the webserver
     fn setup_prometheus(&self, receivers: Vec<Receiver<Result<EntryDTO, FailureDTO>>>) {
+        /*
         let mut timers: HashMap<String, Histogram> = HashMap::new();
         let mut counters: HashMap<String, Counter> = HashMap::new();
 
@@ -69,7 +72,8 @@ impl SonarServer {
             self.registry
                 .register(Box::new(counter_success))
                 .expect("unable to register timer");
-        }
+            }
+
 
         // TODO optimize this, make a map of receivers and what target they are connected to.
         for mut r in receivers {
@@ -81,19 +85,19 @@ impl SonarServer {
                         Ok(m) => match m {
                             Ok(r) => {
                                 counters
-                                    .get(&counter_success_name(r.target.name.clone()))
-                                    .expect("could not find success counter by key")
+                                .get(&counter_success_name(r.target.name.clone()))
+                                .expect("could not find success counter by key")
                                     .inc();
-                                timers
+                                    timers
                                     .get(&timer_name(r.target.name.clone()))
                                     .expect("could not find timer by key")
                                     .observe(r.latency as f64);
-                            }
+                                }
                             Err(err) => {
                                 timers
-                                    .get(&timer_name(err.target.name.clone()))
-                                    .expect("could not find timer by name")
-                                    .observe(err.latency as f64);
+                                .get(&timer_name(err.target.name.clone()))
+                                .expect("could not find timer by name")
+                                .observe(err.latency as f64);
                             }
                         },
                         Err(err) => {
@@ -103,12 +107,16 @@ impl SonarServer {
                 }
             });
         }
+        */
     }
 
-    pub async fn start(&self, receivers: Vec<Receiver<Result<EntryDTO, FailureDTO>>>) {
-        self.setup_prometheus(receivers);
+    // Returns a pair of (shutdown_signal_sender, graceful_shutdown_complete_sender)
+    pub fn start(
+        &mut self,
+        receivers: Vec<Receiver<Result<EntryDTO, FailureDTO>>>,
+    ) -> (oneshot::Sender<()>, oneshot::Receiver<()>) {
+        // self.setup_prometheus(receivers);
         let is_ip_v4 = self.config.ip.contains(".");
-
         let addr = if is_ip_v4 {
             let ip = self
                 .config
@@ -125,14 +133,27 @@ impl SonarServer {
             SocketAddr::from((ip, self.config.port))
         };
 
-        let registry = self.registry.clone();
+        //let registry = self.registry.clone();
         let make_service = make_service_fn(move |_| {
-            let registry = registry.clone();
+            // let registry = registry.clone();
             async move {
                 Ok::<_, Error>(service_fn(move |req| {
-                    let registry = registry.clone();
+                    // let registry = registry.clone();
                     async move {
-                        let metric_families = registry.gather();
+                        // let metric_families = registry.gather();
+                        // TODO Implement health endpoint
+                        let mut response = Response::new(Body::empty());
+                        if req.uri().path() == "/health" {
+                            /* info!("Handling health response");
+                            tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
+                            info!("Sending response!"); */
+                            return Ok::<_, Error>(response);
+                        } else {
+                            *response.status_mut() = StatusCode::NOT_FOUND;
+                        }
+
+                        Ok::<_, Error>(response)
+                        /*
                         let mut response = Response::new(Body::empty());
                         if req.uri().path() == "/metrics" {
                             let mut buffer = vec![];
@@ -145,18 +166,32 @@ impl SonarServer {
                             *response.status_mut() = StatusCode::NOT_FOUND;
                         }
                         Ok::<_, Error>(response)
+                        */
                     }
                 }))
             }
         });
 
-        //self.server = Some(Server::bind(&addr).serve(make_service));
-        let server = Server::bind(&addr).serve(make_service);
+        let bind = Server::bind(&addr);
+        let server = bind.serve(make_service);
+        let (kill_signal_tx, kill_signal_rx) = oneshot::channel::<()>();
+        let (shutdown_complete_tx, shutdown_complete_rx) = oneshot::channel::<()>();
+        let server = server.with_graceful_shutdown(async {
+            let _ = kill_signal_rx.await;
+            debug!("Server got shutdown signal")
+        });
+        info!("Listening on http://{}/", addr);
 
-        info!("Listening on http://{}/metrics", addr);
+        tokio::spawn(async {
+            if let Err(e) = server.await {
+                error!("server error: {}", e);
+            }
+            info!("Server stopped");
+            shutdown_complete_tx
+                .send(())
+                .expect("failed to send graceful shutdown complete");
+        });
 
-        if let Err(e) = server.await {
-            error!("server error: {}", e);
-        }
+        return (kill_signal_tx, shutdown_complete_rx);
     }
 }
