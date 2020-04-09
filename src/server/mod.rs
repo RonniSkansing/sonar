@@ -190,6 +190,24 @@ impl SonarServer {
             debug!("Server got shutdown signal")
         });
         info!("Listening on http://{}/", addr);
+        if self.config.health_endpoint.is_some() {
+            info!(
+                "Health check endpoint at {}",
+                self.config
+                    .health_endpoint
+                    .clone()
+                    .expect("failed to get health check endpoint path")
+            );
+        }
+        if self.config.prometheus_endpoint.is_some() {
+            info!(
+                "Metrics endpoint at {}",
+                self.config
+                    .prometheus_endpoint
+                    .clone()
+                    .expect("failed to get metrics endpoint path")
+            );
+        }
 
         tokio::spawn(async {
             if let Err(e) = server.await {

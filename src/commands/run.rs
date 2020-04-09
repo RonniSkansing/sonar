@@ -204,7 +204,7 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
             .expect("could not get parent path of config file"),
     )
     .expect("could not create absolute path from config_path");
-    abs_config_path.push(config_file_path);
+    abs_config_path.push(config_file_name);
 
     let watch_root = if abs_config_path.is_dir() {
         abs_config_path.as_path()
