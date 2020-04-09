@@ -133,40 +133,53 @@ impl SonarServer {
             SocketAddr::from((ip, self.config.port))
         };
 
+        let server_config = self.config.clone();
         //let registry = self.registry.clone();
         let make_service = make_service_fn(move |_| {
+            let server_config = server_config.clone();
             // let registry = registry.clone();
             async move {
                 Ok::<_, Error>(service_fn(move |req| {
                     // let registry = registry.clone();
+                    let server_config = server_config.clone();
                     async move {
-                        // let metric_families = registry.gather();
-                        // TODO Implement health endpoint
+                        let server_config = server_config.clone();
                         let mut response = Response::new(Body::empty());
-                        if req.uri().path() == "/health" {
-                            /* info!("Handling health response");
-                            tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
-                            info!("Sending response!"); */
-                            return Ok::<_, Error>(response);
-                        } else {
-                            *response.status_mut() = StatusCode::NOT_FOUND;
+
+                        if server_config.health_endpoint.is_some() {
+                            if req.uri().path()
+                                == server_config
+                                    .health_endpoint
+                                    .expect("failed to unwrap health endpoint path")
+                            {
+                                debug!("Handling health request");
+                                tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
+                                debug!("DONE Handling health request");
+                                return Ok::<_, Error>(response);
+                            }
+                        }
+                        if server_config.prometheus_endpoint.is_some() {
+                            if req.uri().path()
+                                == server_config
+                                    .prometheus_endpoint
+                                    .expect("failed to unwrap prometheus metric endpoint path")
+                            {
+                                debug!("Handling metric request");
+                                // TODO
+                                /*
+                                let metric_families = registry.gather();
+                                let mut buffer = vec![];
+                                let encoder = TextEncoder::new();
+                                encoder
+                                    .encode(&metric_families, &mut buffer)
+                                    .expect("unable to put metrics in buffer");
+                                *response.body_mut() = Body::from(buffer);
+                                */
+                            }
                         }
 
+                        *response.status_mut() = StatusCode::NOT_FOUND;
                         Ok::<_, Error>(response)
-                        /*
-                        let mut response = Response::new(Body::empty());
-                        if req.uri().path() == "/metrics" {
-                            let mut buffer = vec![];
-                            let encoder = TextEncoder::new();
-                            encoder
-                                .encode(&metric_families, &mut buffer)
-                                .expect("unable to put metrics in buffer");
-                            *response.body_mut() = Body::from(buffer);
-                        } else {
-                            *response.status_mut() = StatusCode::NOT_FOUND;
-                        }
-                        Ok::<_, Error>(response)
-                        */
                     }
                 }))
             }

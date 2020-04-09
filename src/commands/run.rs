@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use tokio::spawn;
+use tokio::sync::broadcast::Receiver;
 use tokio::sync::{broadcast::channel, oneshot};
 use tokio::task::JoinHandle;
 
@@ -33,7 +34,8 @@ impl Executor {
         let config_str = match read_to_string(config_path.to_string_lossy().to_string().as_str()) {
             Ok(v) => v,
             Err(err) => {
-                error!("failed to read config file: {}", err);
+                error!("Config file missing - run 'sonar init' to create one and check that the path is correct. You can add the file without stopping the program. For more debug - enable '-d' debug flag for more info. ");
+                debug!("Error: {}", err);
                 return;
             }
         };
@@ -52,6 +54,78 @@ impl Executor {
                 self.handle_server(config.clone()).await;
             }
         }
+    }
+
+    // TODO fix this
+    fn setup_prometheus(&mut self, receivers: Vec<Receiver<Result<EntryDTO, FailureDTO>>>) {
+        /*
+        let mut timers: HashMap<String, Histogram> = HashMap::new();
+        let mut counters: HashMap<String, Counter> = HashMap::new();
+
+        for target in &self.targets {
+            let counter_success_name = counter_success_name(target.name.clone());
+            let counter_success = Counter::with_opts(Opts::new(
+                counter_success_name.clone(),
+                String::from("Number of successful requests"),
+            ))
+            .expect("failed to create success counter");
+            counters.insert(counter_success_name.clone(), counter_success.clone());
+
+            let timer_name = timer_name(target.name.clone());
+            let request_time_opts =
+                HistogramOpts::new(timer_name.clone(), String::from("latency in ms"))
+                    // TODO replace with bucket in target
+                    .buckets(vec![
+                        1.0, 10.0, 50.0, 100.0, 200.0, 400.0, 600.0, 800.0, 1000.0, 1200.0, 1400.0,
+                        1600.0, 1800.0, 2000.0,
+                    ]);
+            let request_time =
+                Histogram::with_opts(request_time_opts).expect("unable to create timer");
+
+            timers.insert(timer_name.clone(), request_time.clone());
+
+            self.registry
+                .register(Box::new(request_time))
+                .expect("unable to register timer");
+            self.registry
+                .register(Box::new(counter_success))
+                .expect("unable to register timer");
+            }
+
+
+        // TODO optimize this, make a map of receivers and what target they are connected to.
+        for mut r in receivers {
+            let timers = timers.clone();
+            let counters = counters.clone();
+            tokio::spawn(async move {
+                loop {
+                    match r.recv().await {
+                        Ok(m) => match m {
+                            Ok(r) => {
+                                counters
+                                .get(&counter_success_name(r.target.name.clone()))
+                                .expect("could not find success counter by key")
+                                    .inc();
+                                    timers
+                                    .get(&timer_name(r.target.name.clone()))
+                                    .expect("could not find timer by key")
+                                    .observe(r.latency as f64);
+                                }
+                            Err(err) => {
+                                timers
+                                .get(&timer_name(err.target.name.clone()))
+                                .expect("could not find timer by name")
+                                .observe(err.latency as f64);
+                            }
+                        },
+                        Err(err) => {
+                            error!("Failed to read message: {}", err);
+                        }
+                    }
+                }
+            });
+        }
+        */
     }
 
     async fn handle_grafana_dashboard(&self, config: Config) {
@@ -124,8 +198,17 @@ impl Executor {
 }
 
 pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<(), Box<dyn Error>> {
-    let abs_config_path = std::fs::canonicalize(config_file_path)
-        .expect("could not create absolute path from config_path");
+    let config_file_name = config_file_path
+        .file_name()
+        .expect("failed to get filename of config");
+    let mut abs_config_path = std::fs::canonicalize(
+        config_file_path
+            .parent()
+            .expect("could not get parent path of config file"),
+    )
+    .expect("could not create absolute path from config_path");
+    abs_config_path.push(config_file_path);
+
     let watch_root = if abs_config_path.is_dir() {
         abs_config_path.as_path()
     } else {

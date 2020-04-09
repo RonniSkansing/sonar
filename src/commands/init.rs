@@ -11,6 +11,9 @@ pub fn execute() {
     let server = Some(ServerConfig {
         ip: String::from("0.0.0.0"),
         port: 8080,
+        health_endpoint: Some(String::from("/health")),
+        prometheus_endpoint: Some(String::from("/metrics")),
+        // TODO:  prometheus process metrics -> bool
     });
     let grafana_config = GrafanaConfig {
         // TODO make the path default to ./sonar-dashboard.json
