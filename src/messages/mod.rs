@@ -1,6 +1,7 @@
 use crate::config::{Config, Target};
 use chrono::{DateTime, TimeZone, Utc};
 
+/*
 #[derive(Debug, Clone)]
 pub struct Command<T> {
     r#type: JobEventType,
@@ -22,6 +23,7 @@ impl<T> Command<T> {
         }
     }
 }
+*/
 
 #[derive(Debug, Clone)]
 pub enum JobEventType {

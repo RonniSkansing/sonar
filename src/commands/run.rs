@@ -1,5 +1,5 @@
 use crate::config::{grafana::to_prometheus_grafana, Config};
-use crate::messages::{Command, EntryDTO, FailureDTO};
+use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporter;
 use crate::{requesters::http::HttpRequester, server::SonarServer};
 use log::*;
@@ -30,7 +30,7 @@ impl Executor {
         }
     }
 
-    pub async fn handle(&mut self, config_path: PathBuf, config_reloading: bool) {
+    pub async fn handle(&mut self, config_path: PathBuf) {
         let config_str = match read_to_string(config_path.to_string_lossy().to_string().as_str()) {
             Ok(v) => v,
             Err(err) => {
@@ -45,11 +45,8 @@ impl Executor {
                 return;
             }
             Ok(config) => {
-                if !config_reloading {
-                    info!("Config loaded");
-                } else {
-                    info!("Config reloaded");
-                }
+                info!("Config loaded");
+
                 self.handle_grafana_dashboard(config.clone()).await;
                 self.handle_server(config.clone()).await;
             }
@@ -234,7 +231,7 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
     // command dispatcher // TODO fix channel capacity
     // let (sender, _) = tokio::sync::broadcast::channel::<Command<_>>(100);
     let mut executor = Executor::new();
-    executor.handle(abs_config_path.clone(), false).await;
+    executor.handle(abs_config_path.clone()).await;
     loop {
         match rx.recv() {
             Ok(event) => match event {
@@ -242,7 +239,7 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
                     if !is_config_file(&path, &abs_config_path) {
                         continue;
                     }
-                    executor.handle(abs_config_path.clone(), true).await;
+                    executor.handle(abs_config_path.clone()).await;
                 }
                 DebouncedEvent::Remove(path) => {
                     if !is_config_file(&path, &abs_config_path) {

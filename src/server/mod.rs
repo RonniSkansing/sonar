@@ -13,7 +13,6 @@ pub struct SonarServer {
     config: ServerConfig,
     targets: Vec<Target>,
     registry: Registry,
-    shutdownSender: Option<oneshot::Sender<()>>,
 }
 
 pub fn prometheus_normalize_name(s: String) -> String {
@@ -34,7 +33,6 @@ impl SonarServer {
             config,
             targets,
             registry: Registry::new(),
-            shutdownSender: None,
         }
     }
 
@@ -153,8 +151,6 @@ impl SonarServer {
                                     .expect("failed to unwrap health endpoint path")
                             {
                                 debug!("Handling health request");
-                                tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
-                                debug!("DONE Handling health request");
                                 return Ok::<_, Error>(response);
                             }
                         }
