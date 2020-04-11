@@ -1,103 +1,21 @@
-use crate::config::{ServerConfig, Target};
+use crate::config::ServerConfig;
 use crate::messages::{EntryDTO, FailureDTO};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Response, Server, StatusCode};
 use log::*;
-use prometheus::{Counter, Encoder, Histogram, HistogramOpts, Opts, Registry, TextEncoder};
-use std::collections::HashMap;
+use prometheus::{Encoder, Registry, TextEncoder};
 use std::net::SocketAddr;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use tokio::sync::{broadcast::Receiver, oneshot};
 
 pub struct SonarServer {
     config: ServerConfig,
-    targets: Vec<Target>,
     registry: Option<Registry>,
 }
 
 impl SonarServer {
-    pub fn new(
-        config: ServerConfig,
-        registry: Option<Registry>,
-        targets: Vec<Target>,
-    ) -> SonarServer {
-        SonarServer {
-            config,
-            targets,
-            registry,
-        }
-    }
-
-    // TODO move this out of the webserver
-    fn setup_prometheus(&self, receivers: Vec<Receiver<Result<EntryDTO, FailureDTO>>>) {
-        /*
-        let mut timers: HashMap<String, Histogram> = HashMap::new();
-        let mut counters: HashMap<String, Counter> = HashMap::new();
-
-        for target in &self.targets {
-            let counter_success_name = counter_success_name(target.name.clone());
-            let counter_success = Counter::with_opts(Opts::new(
-                counter_success_name.clone(),
-                String::from("Number of successful requests"),
-            ))
-            .expect("failed to create success counter");
-            counters.insert(counter_success_name.clone(), counter_success.clone());
-
-            let timer_name = timer_name(target.name.clone());
-            let request_time_opts =
-                HistogramOpts::new(timer_name.clone(), String::from("latency in ms"))
-                    // TODO replace with bucket in target
-                    .buckets(vec![
-                        1.0, 10.0, 50.0, 100.0, 200.0, 400.0, 600.0, 800.0, 1000.0, 1200.0, 1400.0,
-                        1600.0, 1800.0, 2000.0,
-                    ]);
-            let request_time =
-                Histogram::with_opts(request_time_opts).expect("unable to create timer");
-
-            timers.insert(timer_name.clone(), request_time.clone());
-
-            self.registry
-                .register(Box::new(request_time))
-                .expect("unable to register timer");
-            self.registry
-                .register(Box::new(counter_success))
-                .expect("unable to register timer");
-            }
-
-
-        // TODO optimize this, make a map of receivers and what target they are connected to.
-        for mut r in receivers {
-            let timers = timers.clone();
-            let counters = counters.clone();
-            tokio::spawn(async move {
-                loop {
-                    match r.recv().await {
-                        Ok(m) => match m {
-                            Ok(r) => {
-                                counters
-                                .get(&counter_success_name(r.target.name.clone()))
-                                .expect("could not find success counter by key")
-                                    .inc();
-                                    timers
-                                    .get(&timer_name(r.target.name.clone()))
-                                    .expect("could not find timer by key")
-                                    .observe(r.latency as f64);
-                                }
-                            Err(err) => {
-                                timers
-                                .get(&timer_name(err.target.name.clone()))
-                                .expect("could not find timer by name")
-                                .observe(err.latency as f64);
-                            }
-                        },
-                        Err(err) => {
-                            error!("Failed to read message: {}", err);
-                        }
-                    }
-                }
-            });
-        }
-        */
+    pub fn new(config: ServerConfig, registry: Option<Registry>) -> SonarServer {
+        SonarServer { config, registry }
     }
 
     // Returns a pair of (shutdown_signal_sender, graceful_shutdown_complete_sender)

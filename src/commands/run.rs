@@ -64,18 +64,21 @@ impl Executor {
                 info!("Config loaded");
 
                 self.handle_grafana_dashboard(config.clone()).await;
+                let request_data_receivers = self.handle_requesters(config.targets.clone()).await;
                 if config.server.is_some() {
                     match config.server.clone() {
                         Some(server_config) => {
                             if server_config.prometheus_endpoint.is_some() {
-                                self.handle_prometheus_exporter(config.targets.clone(), Vec::new());
+                                self.handle_prometheus_exporter(
+                                    config.targets.clone(),
+                                    request_data_receivers,
+                                );
                             }
                         }
                         _ => (),
                     }
                 }
                 self.handle_server(config.clone()).await;
-                self.handle_requesters(config.targets.clone()).await;
             }
         }
     }
@@ -113,21 +116,21 @@ impl Executor {
         }
     }
 
-    async fn handle_requesters(&mut self, targets: Vec<Target>) {
+    async fn handle_requesters(
+        &mut self,
+        targets: Vec<Target>,
+    ) -> Vec<broadcast::Receiver<Result<EntryDTO, FailureDTO>>> {
         // stop/clean out old requesters
         self.stop_reporters().await;
         self.stop_requesters().await;
 
-        //let mut receivers = Vec::new();
-        // Requesters
-        //let mut requesters = Vec::new();
-        //let mut reporters = Vec::new();
-
         let mut requester_abort_controllers = Vec::new();
         let mut reporter_abort_controllers = Vec::new();
+        let mut request_result_rx = Vec::new();
         for target in targets {
             // TODO set the capacity to be number of concurrent requests?
-            let (broadcast_tx, _) = channel::<Result<EntryDTO, FailureDTO>>(100);
+            let (broadcast_tx, _broadcast_rx) = channel::<Result<EntryDTO, FailureDTO>>(100);
+            request_result_rx.push(_broadcast_rx);
 
             // reporters
             let (abort_controller, abort_reg, syncronizer) = tokio_shutdown::new();
@@ -151,29 +154,11 @@ impl Executor {
             tokio::spawn(to_abortable_with_registration(abort_reg, async move {
                 requester.run(target).await;
             }));
-            /*
-            // receivers.push(sender.subscribe());
-            // TODO integrate recievers with prometheus metrics
-            // let reporter_location = target.log.file.clone();
-
-            // TODO implent reboot fix FileReporter
-            let mut file_reporter = FileReporterTask::new(reporter_location, recv)
-                .expect("failed to create flat file reporter");
-
-                reporters.push(file_reporter);
-            file_reporter.start().await;
-            debug!("fe");
-            */
-
-            /*
-            let mut requester = HttpRequestTask::new(self.http_client.clone(), sender);
-            let target = target.clone();
-
-            requester.start(target);
-            requesters.push(requester);
-            */
         }
+
         self.requester_abort_controllers = Some(requester_abort_controllers);
+
+        request_result_rx
     }
 
     fn handle_prometheus_exporter(
@@ -222,11 +207,6 @@ impl Executor {
             let counters = counters.clone();
             tokio::spawn(async move {
                 loop {
-                    loop {
-                        println!("Busy worker");
-                        tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
-                    }
-
                     match r.recv().await {
                         Ok(m) => match m {
                             Ok(r) => {
@@ -249,7 +229,7 @@ impl Executor {
                             }
                         },
                         Err(err) => {
-                            error!("Failed to read message: {}", err);
+                            debug!("failed to read message: {}", err);
                         }
                     }
                 }
@@ -291,7 +271,7 @@ impl Executor {
     async fn start_server(&mut self, config: Config) {
         // start server
         let config = config.server.expect("failed to unwrap server config");
-        let mut server = SonarServer::new(config, self.prometheus_registry.take(), Vec::new());
+        let mut server = SonarServer::new(config, self.prometheus_registry.take());
         let (server_kill_sender, graceful_shutdown_complete_receiver) = server.start(Vec::new());
         self.server_kill_sender = Some(server_kill_sender);
         self.graceful_shutdown_complete_receiver = Some(graceful_shutdown_complete_receiver);
@@ -360,10 +340,10 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
         .watch(watch_root, RecursiveMode::NonRecursive)
         .expect("failed to watch config root folder");
 
-    // command dispatcher // TODO fix channel capacity
-    // let (sender, _) = tokio::sync::broadcast::channel::<Command<_>>(100);
+    // handle initial start run
     let mut executor = Executor::new(client);
     executor.handle(abs_config_path.clone()).await;
+    // handle when changes are made to the config file
     loop {
         match rx.recv() {
             Ok(event) => match event {
@@ -385,70 +365,6 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
             Err(err) => panic!("Failed to listen to config changes: {}", err.to_string()),
         }
     }
-
-    tokio::time::delay_for(std::time::Duration::from_secs(160)).await;
-    println!("STOPPING!");
-    return Ok(());
-
-    /*
-    let config_str = read_to_string(config_path.as_str())?;
-    let config: Config = serde_yaml::from_str(&config_str)?;
-    let server_config = config.server.clone();
-    let config_targets = config.targets.clone();
-    let mut tasks: Vec<JoinHandle<_>> = vec![];
-    let mut receivers = vec![];
-
-    if config.grafana.is_some() {
-        let path = config
-            .clone()
-            .grafana
-            .expect("failed to unwrap grafana config")
-            .dashboard_path
-            .clone();
-        debug!("Writting grafana dashboard file to: {}", path.clone());
-        File::create(path)
-            .expect("failed to create grafana dashboard.json file")
-            .write_all(to_prometheus_grafana(&config).as_bytes())
-            .expect("failed to write dashboard json to file");
-    }
-
-    // TODO send a start signal to all requesters when everything is ready so we do not loose requests
-    for target in config.targets {
-        // TODO set the capacity to be number of concurrent requests?
-        let (sender, recv) = channel::<Result<EntryDTO, FailureDTO>>(100);
-        receivers.push(sender.subscribe());
-        let reporter_location = target.log.file.clone();
-
-        tasks.push(spawn(async move {
-            if reporter_location == "" {
-                debug!("Skipping file reporter {}", reporter_location);
-            } else {
-                debug!("Starting file reporter {}", reporter_location);
-                FileReporter::new(reporter_location, recv)
-                    .expect("failed to create flat file reporter")
-                    .listen()
-                    .await;
-            }
-        }));
-
-        let mut requester = HttpRequester::new(client.clone(), sender);
-        let target = target.clone();
-        tasks.push(spawn(async move {
-            requester.run(target).await;
-        }));
-    }
-
-    tasks.push(spawn(async move {
-        let server = SonarServer::new(server_config, config_targets);
-        server.start(receivers).await;
-    }));
-
-    for t in tasks.drain(..) {
-        t.await.expect("failed to listen to task to completion");
-    }
-
-    Ok(())
-    */
 }
 
 // todo seems bloaty
