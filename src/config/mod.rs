@@ -70,8 +70,9 @@ pub struct Target {
     // how to handle when max_concurrent and the next interval is hit.
     #[serde(default = "Target::default_strategy")]
     pub request_strategy: RequestStrategy,
-    #[serde(default = "Target::default_shutdown_strategy")]
-    pub shutdown_strategy: ShutdownStrategy,
+    // TODO
+    // #[serde(default = "Target::default_shutdown_strategy")]
+    // pub shutdown_strategy: ShutdownStrategy,
 }
 
 impl Target {
@@ -93,7 +94,7 @@ impl Target {
         1
     }
 
-    fn default_shutdown_strategy() -> ShutdownStrategy {
+    fn _default_shutdown_strategy() -> ShutdownStrategy {
         ShutdownStrategy::Graceful
     }
 }
