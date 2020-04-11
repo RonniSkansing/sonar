@@ -2,8 +2,12 @@ use crate::config::{grafana::to_prometheus_grafana, Config, Target};
 use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporterTask;
 use crate::utils::prometheus as util_prometheus;
+use crate::utils::tokio_shutdown::{self, to_abortable_with_registration, AbortController};
 use crate::{requesters::http::HttpRequestTask, server::SonarServer};
+use futures::future::{AbortHandle, Abortable};
 use log::*;
+use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+use prometheus::{Counter, Encoder, Histogram, HistogramOpts, Opts, Registry, TextEncoder};
 use reqwest::Client;
 use std::error::Error;
 use std::fs::File;
@@ -12,14 +16,9 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
-
-use futures::future::{AbortHandle, Abortable};
-use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
-use prometheus::{Counter, Encoder, Histogram, HistogramOpts, Opts, Registry, TextEncoder};
 use tokio::spawn;
 use tokio::sync::broadcast;
 use tokio::sync::{broadcast::channel, oneshot};
-use tokio_shutdown::{to_abortable_with_registration, AbortController};
 
 #[derive()]
 pub struct Executor {

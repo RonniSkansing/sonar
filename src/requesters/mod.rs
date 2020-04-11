@@ -1,16 +1,15 @@
 pub mod http {
     use crate::config::{RequestStrategy, Target};
     use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
+    use crate::utils::tokio_shutdown::Syncronizer;
     use atomic::AtomicU32;
     use chrono::Utc;
     use duration_string::DurationString;
-    use futures::future::{AbortHandle, Abortable};
     use log::*;
     use reqwest::Client;
     use std::sync::atomic::{self, Ordering};
     use std::time::Instant;
     use tokio::sync::broadcast;
-    use tokio_shutdown::Syncronizer;
 
     pub struct HttpRequestTask {
         client: Client,

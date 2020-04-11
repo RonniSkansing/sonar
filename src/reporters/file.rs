@@ -2,11 +2,11 @@ use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
 use crate::{config::ReportOn, utils::file::Append};
 use log::*;
 
+use crate::utils::tokio_shutdown::Syncronizer;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use tokio::sync::broadcast;
-use tokio_shutdown::Syncronizer;
 
 pub struct FileReporterTask {
     file: File,

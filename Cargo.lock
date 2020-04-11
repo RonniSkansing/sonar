@@ -1207,7 +1207,6 @@ dependencies = [
  "strum",
  "strum_macros",
  "tokio",
- "tokio_shutdown",
 ]
 
 [[package]]
@@ -1377,14 +1376,6 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite",
- "tokio",
-]
-
-[[package]]
-name = "tokio_shutdown"
-version = "0.0.0"
-dependencies = [
- "futures",
  "tokio",
 ]
 
