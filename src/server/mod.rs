@@ -1,12 +1,11 @@
 use crate::config::ServerConfig;
-use crate::messages::{EntryDTO, FailureDTO};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Response, Server, StatusCode};
 use log::*;
 use prometheus::{Encoder, Registry, TextEncoder};
 use std::net::SocketAddr;
 use std::net::{Ipv4Addr, Ipv6Addr};
-use tokio::sync::{broadcast::Receiver, oneshot};
+use tokio::sync::oneshot;
 
 pub struct SonarServer {
     config: ServerConfig,
@@ -19,11 +18,7 @@ impl SonarServer {
     }
 
     // Returns a pair of (shutdown_signal_sender, graceful_shutdown_complete_sender)
-    pub fn start(
-        &mut self,
-        receivers: Vec<Receiver<Result<EntryDTO, FailureDTO>>>,
-    ) -> (oneshot::Sender<()>, oneshot::Receiver<()>) {
-        // self.setup_prometheus(receivers);
+    pub fn start(&mut self) -> (oneshot::Sender<()>, oneshot::Receiver<()>) {
         let is_ip_v4 = self.config.ip.contains(".");
         let addr = if is_ip_v4 {
             let ip = self

@@ -4,10 +4,9 @@ use crate::reporters::file::FileReporterTask;
 use crate::utils::prometheus as util_prometheus;
 use crate::utils::tokio_shutdown::{self, to_abortable_with_registration, AbortController};
 use crate::{requesters::http::HttpRequestTask, server::SonarServer};
-use futures::future::{AbortHandle, Abortable};
 use log::*;
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
-use prometheus::{Counter, Encoder, Histogram, HistogramOpts, Opts, Registry, TextEncoder};
+use prometheus::{Counter, Histogram, HistogramOpts, Opts, Registry};
 use reqwest::Client;
 use std::error::Error;
 use std::fs::File;
@@ -16,18 +15,15 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
-use tokio::spawn;
 use tokio::sync::broadcast;
 use tokio::sync::{broadcast::channel, oneshot};
 
-#[derive()]
 pub struct Executor {
     http_client: Client,
     server_kill_sender: Option<oneshot::Sender<()>>,
     graceful_shutdown_complete_receiver: Option<oneshot::Receiver<()>>,
     server_running: bool,
     prometheus_registry: Option<Registry>,
-    requester_data_receivers: Option<Vec<broadcast::Receiver<Result<EntryDTO, FailureDTO>>>>,
     requester_abort_controllers: Option<Vec<AbortController>>,
     reporter_abort_controllers: Option<Vec<AbortController>>,
 }
@@ -40,7 +36,6 @@ impl Executor {
             graceful_shutdown_complete_receiver: None,
             server_running: false,
             prometheus_registry: None,
-            requester_data_receivers: None,
             requester_abort_controllers: None,
             reporter_abort_controllers: None,
         }
@@ -133,7 +128,7 @@ impl Executor {
             request_result_rx.push(_broadcast_rx);
 
             // reporters
-            let (abort_controller, abort_reg, syncronizer) = tokio_shutdown::new();
+            let (abort_controller, _, syncronizer) = tokio_shutdown::new();
             let mut file_reporter = FileReporterTask::new(
                 target.log.file.clone(),
                 broadcast_tx.subscribe(),
@@ -272,7 +267,7 @@ impl Executor {
         // start server
         let config = config.server.expect("failed to unwrap server config");
         let mut server = SonarServer::new(config, self.prometheus_registry.take());
-        let (server_kill_sender, graceful_shutdown_complete_receiver) = server.start(Vec::new());
+        let (server_kill_sender, graceful_shutdown_complete_receiver) = server.start();
         self.server_kill_sender = Some(server_kill_sender);
         self.graceful_shutdown_complete_receiver = Some(graceful_shutdown_complete_receiver);
     }

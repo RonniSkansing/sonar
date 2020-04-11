@@ -38,7 +38,6 @@ pub mod tokio_shutdown {
     // Returns the AbortController for aborting, AbortRegistration for wrapping a task that should be able to forcefully stop
     // and the watchgroup itself for listening for graceful shutdown request and signal back that their done
     pub fn new() -> (AbortController, AbortRegistration, Syncronizer) {
-        // TODO fix buffer size
         let (shutdown_tx, shutdown_rx) = mpsc::channel::<ShutdownEvent>(1);
         let (shutdown_is_done_tx, shutdown_is_done_rx) = mpsc::channel::<ShutdownEvent>(1);
         let (aborter, abort_reg) = AbortHandle::new_pair();
@@ -46,10 +45,7 @@ pub mod tokio_shutdown {
         (
             AbortController::new(shutdown_tx, shutdown_is_done_rx, aborter),
             abort_reg,
-            Syncronizer {
-                shutdown_rx,
-                shutdown_is_done_tx,
-            },
+            Syncronizer::new(shutdown_rx, shutdown_is_done_tx),
         )
     }
 
@@ -84,7 +80,7 @@ pub mod tokio_shutdown {
             }
         }
 
-        pub fn shutdown_forcefully(self) {
+        pub fn _shutdown_forcefully(self) {
             self.forceful_stop_handle.abort();
         }
 
@@ -131,7 +127,7 @@ pub mod tokio_shutdown {
         }
     }
 
-    pub fn to_abortable<T>(task: T) -> (Abortable<T>, AbortHandle)
+    pub fn _to_abortable<T>(task: T) -> (Abortable<T>, AbortHandle)
     where
         T: 'static + Future + Send,
     {
