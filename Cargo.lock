@@ -1207,6 +1207,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tokio",
+ "tokio_shutdown",
 ]
 
 [[package]]
@@ -1322,9 +1323,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.13"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fa5e81d6bc4e67fe889d5783bd2a128ab2e0cfa487e0be16b6a8d177b101616"
+checksum = "39fb9142eb6e9cc37f4f29144e62618440b149a138eee01a7bbe9b9226aaf17c"
 dependencies = [
  "bytes",
  "fnv",
@@ -1376,6 +1377,14 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
+name = "tokio_shutdown"
+version = "0.0.0"
+dependencies = [
+ "futures",
  "tokio",
 ]
 

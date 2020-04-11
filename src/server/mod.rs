@@ -12,27 +12,19 @@ use tokio::sync::{broadcast::Receiver, oneshot};
 pub struct SonarServer {
     config: ServerConfig,
     targets: Vec<Target>,
-    registry: Registry,
-}
-
-pub fn prometheus_normalize_name(s: String) -> String {
-    s.replace('-', "_").replace('.', "_")
-}
-
-fn counter_success_name(s: String) -> String {
-    prometheus_normalize_name(s + "_success")
-}
-
-fn timer_name(name: String) -> String {
-    prometheus_normalize_name(name + "_time_ms")
+    registry: Option<Registry>,
 }
 
 impl SonarServer {
-    pub fn new(config: ServerConfig, targets: Vec<Target>) -> SonarServer {
+    pub fn new(
+        config: ServerConfig,
+        registry: Option<Registry>,
+        targets: Vec<Target>,
+    ) -> SonarServer {
         SonarServer {
             config,
             targets,
-            registry: Registry::new(),
+            registry,
         }
     }
 
@@ -132,16 +124,15 @@ impl SonarServer {
         };
 
         let server_config = self.config.clone();
-        //let registry = self.registry.clone();
+        let registry = self.registry.clone();
         let make_service = make_service_fn(move |_| {
             let server_config = server_config.clone();
-            // let registry = registry.clone();
+            let registry = registry.clone();
             async move {
                 Ok::<_, Error>(service_fn(move |req| {
-                    // let registry = registry.clone();
+                    let registry = registry.clone();
                     let server_config = server_config.clone();
                     async move {
-                        let server_config = server_config.clone();
                         let mut response = Response::new(Body::empty());
 
                         if server_config.health_endpoint.is_some() {
@@ -161,8 +152,9 @@ impl SonarServer {
                                     .expect("failed to unwrap prometheus metric endpoint path")
                             {
                                 debug!("Handling metric request");
-                                // TODO
-                                /*
+                                let registry =
+                                    registry.expect("failed to get registry prometheus export");
+
                                 let metric_families = registry.gather();
                                 let mut buffer = vec![];
                                 let encoder = TextEncoder::new();
@@ -170,7 +162,7 @@ impl SonarServer {
                                     .encode(&metric_families, &mut buffer)
                                     .expect("unable to put metrics in buffer");
                                 *response.body_mut() = Body::from(buffer);
-                                */
+                                return Ok::<_, Error>(response);
                             }
                         }
 
@@ -208,7 +200,6 @@ impl SonarServer {
                     .expect("failed to get metrics endpoint path")
             );
         }
-
         tokio::spawn(async {
             if let Err(e) = server.await {
                 error!("server error: {}", e);

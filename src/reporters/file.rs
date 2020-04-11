@@ -5,18 +5,21 @@ use log::*;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use tokio::sync::broadcast::Receiver;
+use tokio::sync::broadcast;
+use tokio_shutdown::Syncronizer;
 
-pub struct FileReporter {
+pub struct FileReporterTask {
     file: File,
-    receiver: Receiver<Result<EntryDTO, FailureDTO>>,
+    receiver: broadcast::Receiver<Result<EntryDTO, FailureDTO>>,
+    _shutdown_sync: Syncronizer,
 }
 
-impl FileReporter {
+impl FileReporterTask {
     pub fn new(
         location: String,
-        receiver: Receiver<Result<EntryDTO, FailureDTO>>,
-    ) -> Result<FileReporter, std::io::Error> {
+        receiver: broadcast::Receiver<Result<EntryDTO, FailureDTO>>,
+        _shutdown_sync: Syncronizer,
+    ) -> Result<FileReporterTask, std::io::Error> {
         let file_path = Path::new(&location);
         let path = file_path
             .parent()
@@ -29,13 +32,14 @@ impl FileReporter {
         }
         let file = File::create_append(file_path).expect("failed to create or open in write mode");
 
-        Ok(FileReporter {
+        Ok(FileReporterTask {
             file: file,
             receiver,
+            _shutdown_sync,
         })
     }
 
-    pub async fn listen(&mut self) {
+    pub async fn run(&mut self) {
         loop {
             match self.receiver.recv().await {
                 Ok(result) => match result {
@@ -53,7 +57,7 @@ impl FileReporter {
                                     Ok(_) => (),
                                     Err(err) => {
                                         error!("failed to write to log file: {}", err.to_string());
-                                        break;
+                                        return;
                                     }
                                 }
                             }
@@ -74,7 +78,7 @@ impl FileReporter {
                                     Ok(_) => (),
                                     Err(err) => {
                                         error!("failed to write to log file: {}", err.to_string());
-                                        break;
+                                        return;
                                     }
                                 }
                             }
@@ -83,10 +87,10 @@ impl FileReporter {
                     }
                 },
                 Err(err) => {
-                    error!("failed to read: {}", err.to_string());
-                    break;
+                    debug!("Closing file reporter: {}", err.to_string());
+                    return;
                 }
-            }
+            };
         }
     }
 }

@@ -1,35 +1,5 @@
-use crate::config::{Config, Target};
+use crate::config::Target;
 use chrono::{DateTime, TimeZone, Utc};
-
-/*
-#[derive(Debug, Clone)]
-pub struct Command<T> {
-    r#type: JobEventType,
-    data: T,
-}
-
-impl<T> Command<T> {
-    pub fn new_grafana_update(config: T) -> Self {
-        Self {
-            r#type: JobEventType::GRAFANA_DASHBOARD_UPDATE,
-            data: config,
-        }
-    }
-
-    pub fn new_start_server(config: T) -> Self {
-        Self {
-            r#type: JobEventType::START_WEB_SERVER,
-            data: config,
-        }
-    }
-}
-*/
-
-#[derive(Debug, Clone)]
-pub enum JobEventType {
-    GRAFANA_DASHBOARD_UPDATE,
-    START_WEB_SERVER,
-}
 
 type ResponseCode = u16;
 #[derive(Debug, Clone)]

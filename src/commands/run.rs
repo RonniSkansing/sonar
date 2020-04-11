@@ -1,32 +1,49 @@
-use crate::config::{grafana::to_prometheus_grafana, Config};
+use crate::config::{grafana::to_prometheus_grafana, Config, Target};
 use crate::messages::{EntryDTO, FailureDTO};
-use crate::reporters::file::FileReporter;
-use crate::{requesters::http::HttpRequester, server::SonarServer};
+use crate::reporters::file::FileReporterTask;
+use crate::utils::prometheus as util_prometheus;
+use crate::{requesters::http::HttpRequestTask, server::SonarServer};
 use log::*;
 use reqwest::Client;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
+use futures::future::{AbortHandle, Abortable};
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+use prometheus::{Counter, Encoder, Histogram, HistogramOpts, Opts, Registry, TextEncoder};
 use tokio::spawn;
-use tokio::sync::broadcast::Receiver;
+use tokio::sync::broadcast;
 use tokio::sync::{broadcast::channel, oneshot};
-use tokio::task::JoinHandle;
+use tokio_shutdown::{to_abortable_with_registration, AbortController};
 
+#[derive()]
 pub struct Executor {
+    http_client: Client,
     server_kill_sender: Option<oneshot::Sender<()>>,
     graceful_shutdown_complete_receiver: Option<oneshot::Receiver<()>>,
     server_running: bool,
+    prometheus_registry: Option<Registry>,
+    requester_data_receivers: Option<Vec<broadcast::Receiver<Result<EntryDTO, FailureDTO>>>>,
+    requester_abort_controllers: Option<Vec<AbortController>>,
+    reporter_abort_controllers: Option<Vec<AbortController>>,
 }
 
 impl Executor {
-    pub fn new() -> Self {
+    pub fn new(http_client: Client) -> Self {
         Self {
+            http_client,
             server_kill_sender: None,
             graceful_shutdown_complete_receiver: None,
             server_running: false,
+            prometheus_registry: None,
+            requester_data_receivers: None,
+            requester_abort_controllers: None,
+            reporter_abort_controllers: None,
         }
     }
 
@@ -48,19 +65,129 @@ impl Executor {
                 info!("Config loaded");
 
                 self.handle_grafana_dashboard(config.clone()).await;
+                if config.server.is_some() {
+                    match config.server.clone() {
+                        Some(server_config) => {
+                            if server_config.prometheus_endpoint.is_some() {
+                                self.handle_prometheus_exporter(config.targets.clone(), Vec::new());
+                            }
+                        }
+                        _ => (),
+                    }
+                }
                 self.handle_server(config.clone()).await;
+                self.handle_requesters(config.targets.clone()).await;
             }
         }
     }
 
-    // TODO fix this
-    fn setup_prometheus(&mut self, receivers: Vec<Receiver<Result<EntryDTO, FailureDTO>>>) {
-        /*
+    async fn stop_all(&mut self, abort_controllers: Vec<AbortController>) {
+        let mut join_handles = Vec::new();
+        for c in abort_controllers {
+            join_handles.push(tokio::spawn(async {
+                let _ = c.shutdown_gracefully().await;
+            }));
+        }
+
+        for jh in join_handles.drain(..) {
+            let _ = jh.await;
+        }
+    }
+
+    async fn stop_reporters(&mut self) {
+        if self.reporter_abort_controllers.is_some() {
+            let controllers = self
+                .requester_abort_controllers
+                .take()
+                .expect("failed to take requester forceful shutdown handlers");
+            self.stop_all(controllers).await;
+        }
+    }
+
+    async fn stop_requesters(&mut self) {
+        if self.requester_abort_controllers.is_some() {
+            let controllers = self
+                .requester_abort_controllers
+                .take()
+                .expect("failed to take requester forceful shutdown handlers");
+            self.stop_all(controllers).await;
+        }
+    }
+
+    async fn handle_requesters(&mut self, targets: Vec<Target>) {
+        // stop/clean out old requesters
+        self.stop_reporters().await;
+        self.stop_requesters().await;
+
+        //let mut receivers = Vec::new();
+        // Requesters
+        //let mut requesters = Vec::new();
+        //let mut reporters = Vec::new();
+
+        let mut requester_abort_controllers = Vec::new();
+        let mut reporter_abort_controllers = Vec::new();
+        for target in targets {
+            // TODO set the capacity to be number of concurrent requests?
+            let (broadcast_tx, _) = channel::<Result<EntryDTO, FailureDTO>>(100);
+
+            // reporters
+            let (abort_controller, abort_reg, syncronizer) = tokio_shutdown::new();
+            let mut file_reporter = FileReporterTask::new(
+                target.log.file.clone(),
+                broadcast_tx.subscribe(),
+                syncronizer,
+            )
+            .expect("failed to create flat file reporter");
+
+            reporter_abort_controllers.push(abort_controller);
+            tokio::spawn(async move {
+                file_reporter.run().await;
+            });
+
+            // requesters
+            let (abort_controller, abort_reg, syncronizer) = tokio_shutdown::new();
+            let requester =
+                HttpRequestTask::new(self.http_client.clone(), broadcast_tx, syncronizer);
+            requester_abort_controllers.push(abort_controller);
+            tokio::spawn(to_abortable_with_registration(abort_reg, async move {
+                requester.run(target).await;
+            }));
+            /*
+            // receivers.push(sender.subscribe());
+            // TODO integrate recievers with prometheus metrics
+            // let reporter_location = target.log.file.clone();
+
+            // TODO implent reboot fix FileReporter
+            let mut file_reporter = FileReporterTask::new(reporter_location, recv)
+                .expect("failed to create flat file reporter");
+
+                reporters.push(file_reporter);
+            file_reporter.start().await;
+            debug!("fe");
+            */
+
+            /*
+            let mut requester = HttpRequestTask::new(self.http_client.clone(), sender);
+            let target = target.clone();
+
+            requester.start(target);
+            requesters.push(requester);
+            */
+        }
+        self.requester_abort_controllers = Some(requester_abort_controllers);
+    }
+
+    fn handle_prometheus_exporter(
+        &mut self,
+        targets: Vec<Target>,
+        receivers: Vec<broadcast::Receiver<Result<EntryDTO, FailureDTO>>>,
+    ) {
         let mut timers: HashMap<String, Histogram> = HashMap::new();
         let mut counters: HashMap<String, Counter> = HashMap::new();
+        let registry = Registry::new();
 
-        for target in &self.targets {
-            let counter_success_name = counter_success_name(target.name.clone());
+        for target in &targets {
+            let counter_success_name = util_prometheus::counter_success_name(target.name.clone());
             let counter_success = Counter::with_opts(Opts::new(
                 counter_success_name.clone(),
                 String::from("Number of successful requests"),
@@ -68,7 +195,7 @@ impl Executor {
             .expect("failed to create success counter");
             counters.insert(counter_success_name.clone(), counter_success.clone());
 
-            let timer_name = timer_name(target.name.clone());
+            let timer_name = util_prometheus::timer_name(target.name.clone());
             let request_time_opts =
                 HistogramOpts::new(timer_name.clone(), String::from("latency in ms"))
                     // TODO replace with bucket in target
@@ -81,14 +208,14 @@ impl Executor {
 
             timers.insert(timer_name.clone(), request_time.clone());
 
-            self.registry
+            registry
                 .register(Box::new(request_time))
                 .expect("unable to register timer");
-            self.registry
+            registry
                 .register(Box::new(counter_success))
                 .expect("unable to register timer");
-            }
-
+        }
+        self.prometheus_registry = Some(registry);
 
         // TODO optimize this, make a map of receivers and what target they are connected to.
         for mut r in receivers {
@@ -96,23 +223,30 @@ impl Executor {
             let counters = counters.clone();
             tokio::spawn(async move {
                 loop {
+                    loop {
+                        println!("Busy worker");
+                        tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+                    }
+
                     match r.recv().await {
                         Ok(m) => match m {
                             Ok(r) => {
                                 counters
-                                .get(&counter_success_name(r.target.name.clone()))
-                                .expect("could not find success counter by key")
+                                    .get(&util_prometheus::counter_success_name(
+                                        r.target.name.clone(),
+                                    ))
+                                    .expect("could not find success counter by key")
                                     .inc();
-                                    timers
-                                    .get(&timer_name(r.target.name.clone()))
+                                timers
+                                    .get(&util_prometheus::timer_name(r.target.name.clone()))
                                     .expect("could not find timer by key")
                                     .observe(r.latency as f64);
-                                }
+                            }
                             Err(err) => {
                                 timers
-                                .get(&timer_name(err.target.name.clone()))
-                                .expect("could not find timer by name")
-                                .observe(err.latency as f64);
+                                    .get(&util_prometheus::timer_name(err.target.name.clone()))
+                                    .expect("could not find timer by name")
+                                    .observe(err.latency as f64);
                             }
                         },
                         Err(err) => {
@@ -122,7 +256,6 @@ impl Executor {
                 }
             });
         }
-        */
     }
 
     async fn handle_grafana_dashboard(&self, config: Config) {
@@ -159,7 +292,7 @@ impl Executor {
     async fn start_server(&mut self, config: Config) {
         // start server
         let config = config.server.expect("failed to unwrap server config");
-        let mut server = SonarServer::new(config, Vec::new());
+        let mut server = SonarServer::new(config, self.prometheus_registry.take(), Vec::new());
         let (server_kill_sender, graceful_shutdown_complete_receiver) = server.start(Vec::new());
         self.server_kill_sender = Some(server_kill_sender);
         self.graceful_shutdown_complete_receiver = Some(graceful_shutdown_complete_receiver);
@@ -230,7 +363,7 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
 
     // command dispatcher // TODO fix channel capacity
     // let (sender, _) = tokio::sync::broadcast::channel::<Command<_>>(100);
-    let mut executor = Executor::new();
+    let mut executor = Executor::new(client);
     executor.handle(abs_config_path.clone()).await;
     loop {
         match rx.recv() {
@@ -242,6 +375,7 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
                     executor.handle(abs_config_path.clone()).await;
                 }
                 DebouncedEvent::Remove(path) => {
+                    // TODO
                     if !is_config_file(&path, &abs_config_path) {
                         continue;
                     }
@@ -252,82 +386,7 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
             Err(err) => panic!("Failed to listen to config changes: {}", err.to_string()),
         }
     }
-    /*
-       hotwatch
-           .watch(watch_root, move |event: Event| match event {
-               Event::Create(path) | Event::Write(path) => {
-                   if !is_config_file(&path, &abs_config_path) {
-                       return;
-                   }
-                   let config_str =
-                       read_to_string(abs_config_path.to_string_lossy().to_string().as_str())
-                           .expect("failed to read config file");
-                   match serde_yaml::from_str::<Config>(&config_str) {
-                       Err(err) => {
-                           info!("Invalid config - Please fix: {}", err);
-                           return;
-                       }
-                       Ok(config) => {
-                           info!("Config loaded");
 
-                           // let mut grafana_dashboard_consumer_setup = false;
-                           let sender = sender.clone();
-                           println!("The End");
-                           return;
-                           tokio::spawn(async move {
-                               if config.grafana.is_some() {
-                                   // TODO extract grafana_dashboard_consumer
-                                   let mut receiver = sender.subscribe();
-                                   //if !grafana_dashboard_consumer_setup {
-                                   tokio::spawn(async move {
-                                       // grafana_dashboard_consumer_setup = true;
-                                       for command in receiver.recv().await {
-                                           println!("Got command to do! {:?}", command);
-                                       }
-                                       /*
-                                       // TODO extract dashboard consumer
-                                                                       let path = config
-                                           .clone()
-                                           .grafana
-                                           .expect("failed to unwrap grafana config")
-                                           .dashboard_path
-                                           .clone();
-                                       debug!("Writting grafana dashboard file to: {}", path.clone());
-                                       File::create(path)
-                                           .expect("failed to create grafana dashboard.json file")
-                                           .write_all(to_prometheus_grafana(&config).as_bytes())
-                                           .expect("failed to write dashboard json to file");
-                                           */
-                                   });
-                                   //}
-                                   let command = Command::new_grafana_update(config);
-                                   sender
-                                       .send(command)
-                                       .expect("failed to broadcast update grafana command");
-                               }
-                           });
-                       }
-                   }
-                   /*
-                   let config: Config = serde_yaml::from_str(&config_str)
-                       .expect("failed to create yaml from config");
-                    */
-
-                   //let config_str = read_to_string(;
-                   // if config.grafana.is_some() {}
-                   println!("Config file was changed");
-                   // TODO
-               }
-               Event::Remove(path) => {
-                   if is_config_file(&path, &abs_config_path) {
-                       println!("Config file was deleted! oh noes");
-                       // TODO
-                   }
-               }
-               _ => (),
-           })
-           .expect("Failed to config watch file!");
-    */
     tokio::time::delay_for(std::time::Duration::from_secs(160)).await;
     println!("STOPPING!");
     return Ok(());
@@ -393,6 +452,7 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
     */
 }
 
+// todo seems bloaty
 fn is_config_file(path: &PathBuf, config_path: &PathBuf) -> bool {
     path.eq(config_path)
 }

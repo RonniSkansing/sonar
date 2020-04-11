@@ -1,5 +1,6 @@
 use crate::config::{
-    Config, GrafanaConfig, LogFile, ReportOn, RequestStrategy, ServerConfig, Target,
+    Config, GrafanaConfig, LogFile, ReportOn, RequestStrategy, ServerConfig, ShutdownStrategy,
+    Target,
 };
 use duration_string::DurationString;
 use log::*;
@@ -29,6 +30,7 @@ pub fn execute() {
             timeout: DurationString::from_string(String::from("5s"))
                 .expect("could not create duration string"),
             request_strategy: RequestStrategy::Wait,
+            shutdown_strategy: ShutdownStrategy::Graceful,
             log: LogFile {
                 file: String::from("./log/name-example.com.log"),
                 report_on: ReportOn::Success,
@@ -43,6 +45,7 @@ pub fn execute() {
             timeout: DurationString::from_string(String::from("5s"))
                 .expect("could not create duration string"),
             request_strategy: RequestStrategy::Wait,
+            shutdown_strategy: ShutdownStrategy::Graceful,
             log: LogFile {
                 file: String::from("./log/name-example.com.log"),
                 report_on: ReportOn::Failure,

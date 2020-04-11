@@ -1,5 +1,5 @@
 use super::*;
-use crate::server::prometheus_normalize_name;
+use crate::utils::prometheus;
 use grafana_dashboard::panel::{
     AliasColors, Axe, Axis, GridPos, Legend, Panel, Target as PanelTarget, ToolTip,
 };
@@ -83,7 +83,7 @@ pub fn panel_from_target(id: u32, target: &Target) -> Panel {
         let prometheus_metric_name = format!(
             "histogram_quantile(0.{}, sum(rate({}_time_ms_bucket[5m])) by (le))",
             n_string,
-            prometheus_normalize_name(target.name.to_string())
+            prometheus::normalize_name(target.name.to_string())
         );
 
         panel_targets.push(PanelTarget {

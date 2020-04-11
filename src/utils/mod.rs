@@ -14,3 +14,17 @@ pub mod file {
     }
     impl Append for std::fs::File {}
 }
+
+pub mod prometheus {
+    pub fn normalize_name(s: String) -> String {
+        s.replace('-', "_").replace('.', "_")
+    }
+
+    pub fn counter_success_name(s: String) -> String {
+        normalize_name(s + "_success")
+    }
+
+    pub fn timer_name(name: String) -> String {
+        normalize_name(name + "_time_ms")
+    }
+}
