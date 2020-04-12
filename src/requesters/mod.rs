@@ -35,12 +35,19 @@ pub mod http {
                 "Starting requester for {} with strategy {}",
                 target.url, target.request_strategy
             );
+            println!(
+                "Ticking with interval of: {}s",
+                target.interval.clone().to_string()
+            );
             let mut interval =
                 tokio::time::interval(DurationString::from(target.interval.clone()).into());
             interval.tick().await;
             let currently_running = std::sync::Arc::from(AtomicU32::new(0));
             match target.request_strategy {
                 RequestStrategy::Wait => loop {
+                    // TODO bug, this only starts to hear about a graceful shutdown
+                    // on next request iteration.. imaging there was 200s between,
+                    // it would take forever
                     if self.shutdown_sync.should_stop() {
                         info!("graceful shutdown of requests to {}", target.url);
                         self.shutdown_sync.done().await;
@@ -54,12 +61,6 @@ pub mod http {
                     }
                     currently_running.fetch_add(1, Ordering::SeqCst);
 
-                    debug!(
-                        "Concurrent: {}\tGET {} to Http Requester",
-                        currently_running.load(Ordering::SeqCst),
-                        target.url
-                    );
-
                     let client = self.client.clone();
                     let sender = self.broadcaster.clone();
                     let target = target.clone();
@@ -70,37 +71,40 @@ pub mod http {
                         .timeout(DurationString::from(target.timeout.clone()).into());
 
                     let latency = Instant::now();
-                    match req.send().await {
-                        Ok(res) => {
-                            let latency_millis = latency.elapsed().as_millis();
-                            let message = Entry::new(
-                                Utc::now(),
-                                latency_millis,
-                                res.status().as_u16(),
-                                target.clone(),
-                            );
-                            sender
-                                .send(Ok(message.to_dto()))
-                                .expect("Failed to send request result");
-                        }
-                        Err(err) => {
-                            let latency_millis = latency.elapsed().as_millis();
+                    let task = async move {
+                        debug!("Sending GET {}", target.url.clone());
+                        match req.send().await {
+                            Ok(res) => {
+                                let latency_millis = latency.elapsed().as_millis();
+                                info!("200\t{}ms\t{}", latency_millis, target.url.clone());
+                                let message = Entry::new(
+                                    Utc::now(),
+                                    latency_millis,
+                                    res.status().as_u16(),
+                                    target.clone(),
+                                );
+                                let _ = sender.send(Ok(message.to_dto()));
+                            }
+                            Err(err) => {
+                                let latency_millis = latency.elapsed().as_millis();
 
-                            let message = Failure::new(
-                                Utc::now(),
-                                latency_millis,
-                                err.to_string(),
-                                target.clone(),
-                            );
-                            match sender.send(Err(message.to_dto())) {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    debug!("Failed to send request result due to: {:?}", err);
-                                }
+                                let message = Failure::new(
+                                    Utc::now(),
+                                    latency_millis,
+                                    err.to_string(),
+                                    target.clone(),
+                                );
+                                info!(
+                                    "Request failure\t{}\t{}",
+                                    target.url.clone(),
+                                    err.to_string()
+                                );
+                                let _ = sender.send(Err(message.to_dto()));
                             }
                         }
-                    }
-                    currently_running.fetch_sub(1, Ordering::SeqCst);
+                        currently_running.fetch_sub(1, Ordering::SeqCst);
+                    };
+                    tokio::spawn(task);
 
                     interval.tick().await;
                 },

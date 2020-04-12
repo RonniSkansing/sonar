@@ -6,7 +6,7 @@ use crate::utils::tokio_shutdown::{self, to_abortable_with_registration, AbortCo
 use crate::{requesters::http::HttpRequestTask, server::SonarServer};
 use log::*;
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
-use prometheus::{Counter, Histogram, HistogramOpts, Opts, Registry};
+use prometheus::{process_collector, Counter, Histogram, HistogramOpts, Opts, Registry};
 use reqwest::Client;
 use std::error::Error;
 use std::fs::File;
@@ -124,22 +124,25 @@ impl Executor {
         let mut request_result_rx = Vec::new();
         for target in targets {
             // TODO set the capacity to be number of concurrent requests?
-            let (broadcast_tx, _broadcast_rx) = channel::<Result<EntryDTO, FailureDTO>>(100);
+            let (broadcast_tx, _broadcast_rx) = channel::<Result<EntryDTO, FailureDTO>>(1);
             request_result_rx.push(_broadcast_rx);
 
             // reporters
-            let (abort_controller, _, syncronizer) = tokio_shutdown::new();
-            let mut file_reporter = FileReporterTask::new(
-                target.log.file.clone(),
-                broadcast_tx.subscribe(),
-                syncronizer,
-            )
-            .expect("failed to create flat file reporter");
+            // TODO replace this with a Option instead of checking file len
+            if target.log.file.len() > 0 {
+                let (abort_controller, _, syncronizer) = tokio_shutdown::new();
+                let mut file_reporter = FileReporterTask::new(
+                    target.log.file.clone(),
+                    broadcast_tx.subscribe(),
+                    syncronizer,
+                )
+                .expect("failed to create flat file reporter");
 
-            reporter_abort_controllers.push(abort_controller);
-            tokio::spawn(async move {
-                file_reporter.run().await;
-            });
+                reporter_abort_controllers.push(abort_controller);
+                tokio::spawn(async move {
+                    file_reporter.run().await;
+                });
+            }
 
             // requesters
             let (abort_controller, abort_reg, syncronizer) = tokio_shutdown::new();
@@ -161,6 +164,12 @@ impl Executor {
         targets: Vec<Target>,
         receivers: Vec<broadcast::Receiver<Result<EntryDTO, FailureDTO>>>,
     ) {
+        // TODO implement
+        // let _process_data = process_collector::ProcessCollector::for_self();
+        // registry
+        //     .register(Box::new(process_data))
+        //     .expect("failed to register process info to registry");
+
         let mut timers: HashMap<String, Histogram> = HashMap::new();
         let mut counters: HashMap<String, Counter> = HashMap::new();
         let registry = Registry::new();

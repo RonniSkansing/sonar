@@ -24,6 +24,9 @@ services:
     image: grafana/grafana:latest
     depends_on:
       - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
       - ./grafana/datasource.yaml:/etc/grafana/provisioning/datasources/sonar-prometheus.yaml
       - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/sonar.yaml

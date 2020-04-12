@@ -143,7 +143,7 @@ fn main() {
     // config debug
     let is_debug = matches.is_present(debug_arg.name);
     if is_debug {
-        std::env::set_var("RUST_BACKTRACE", "full");
+        //std::env::set_var("RUST_BACKTRACE", "full");
     }
 
     // setup logger

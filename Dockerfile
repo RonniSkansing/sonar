@@ -4,7 +4,7 @@ COPY ./ .
 RUN cargo install --debug --path .
 
 FROM debian:buster-slim
-RUN apt update -y && apt install openssl -y
+RUN apt-get update -y && apt-get install openssl -y  && apt-get install ca-certificates
 WORKDIR "/opt/sonar/local-mount" 
 COPY --from=builder /usr/local/cargo/bin/sonar /usr/local/bin/sonar
 RUN mkdir -p /opt/sonar/dashboards/ && mkdir -p /opt/sonar/local-mount

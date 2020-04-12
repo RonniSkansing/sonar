@@ -1,6 +1,5 @@
 use crate::config::{
-    Config, GrafanaConfig, LogFile, ReportOn, RequestStrategy, ServerConfig, ShutdownStrategy,
-    Target,
+    Config, GrafanaConfig, LogFile, ReportOn, RequestStrategy, ServerConfig, Target,
 };
 use duration_string::DurationString;
 use log::*;
@@ -39,7 +38,7 @@ pub fn execute() {
         Target {
             name: String::from("www-example-com"),
             url: String::from("http://example.com"),
-            interval: DurationString::from_string(String::from("2s"))
+            interval: DurationString::from_string(String::from("1s"))
                 .expect("could not create duration string"),
             max_concurrent: 2,
             timeout: DurationString::from_string(String::from("5s"))
