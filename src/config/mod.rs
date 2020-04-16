@@ -1,3 +1,4 @@
+use crate::utils::factory;
 use duration_string::DurationString;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
@@ -29,26 +30,20 @@ pub enum ReportOn {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LogFile {
-    #[serde(default = "LogFile::default_file")]
-    pub file: String,
-    #[serde(default = "LogFile::default_report_on")]
-    pub report_on: ReportOn,
+    #[serde(default = "factory::none", skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+
+    #[serde(default = "factory::none", skip_serializing_if = "Option::is_none")]
+    pub report_on: Option<ReportOn>,
 }
 
 impl LogFile {
-    fn default() -> Self {
-        LogFile {
-            file: Self::default_file(),
-            report_on: Self::default_report_on(),
-        }
-    }
-    // default to an empty string which equals no logging
-    fn default_file() -> String {
-        String::from("")
+    pub fn clone_unwrap_file(&self) -> String {
+        self.file.clone().expect("failed to get file")
     }
 
-    fn default_report_on() -> ReportOn {
-        ReportOn::Failure
+    pub fn clone_unwrap_report_on(&self) -> ReportOn {
+        self.report_on.clone().expect("failed to get report_on")
     }
 }
 
@@ -57,45 +52,60 @@ pub struct Target {
     pub name: String,
     pub url: String,
     // how often a request should happen
-    #[serde(default = "Target::default_interval")]
-    pub interval: DurationString,
+    #[serde(
+        default = "Target::some_default_interval",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub interval: Option<DurationString>,
     // if a request hits the timeout it is canceled
-    #[serde(default = "Target::default_timeout")]
-    pub timeout: DurationString,
+    #[serde(
+        default = "Target::some_default_timeout",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub timeout: Option<DurationString>,
     // number of requests that can run concurrently. 2 means that up to 2 requests will be running a the same time
-    #[serde(default = "Target::default_concurrent")]
-    pub max_concurrent: u32,
-    #[serde(default = "LogFile::default")]
-    pub log: LogFile,
-    // how to handle when max_concurrent and the next interval is hit.
-    #[serde(default = "Target::default_strategy")]
-    pub request_strategy: RequestStrategy,
-    // TODO
-    // #[serde(default = "Target::default_shutdown_strategy")]
-    // pub shutdown_strategy: ShutdownStrategy,
+    #[serde(
+        default = "Target::some_default_max_concurrent",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub max_concurrent: Option<u32>,
+    #[serde(default = "factory::none", skip_serializing_if = "Option::is_none")]
+    pub log: Option<LogFile>,
 }
 
 impl Target {
-    fn default_strategy() -> RequestStrategy {
-        RequestStrategy::Wait
+    fn some_default_timeout() -> Option<DurationString> {
+        Some(
+            DurationString::from_string(String::from("5s"))
+                .expect("failed to create from duration string"),
+        )
     }
 
-    fn default_timeout() -> DurationString {
-        DurationString::from_string(String::from("5s"))
-            .expect("failed to create from duration string")
+    fn some_default_interval() -> Option<DurationString> {
+        Some(
+            DurationString::from_string(String::from("1m"))
+                .expect("failed to create from duration string"),
+        )
     }
 
-    fn default_interval() -> DurationString {
-        DurationString::from_string(String::from("1m"))
-            .expect("failed to create from duration string")
+    fn some_default_max_concurrent() -> Option<u32> {
+        Some(1)
     }
 
-    fn default_concurrent() -> u32 {
-        1
+    pub fn clone_unwrap_interval(&self) -> DurationString {
+        self.interval.clone().expect("failed to get timeout")
     }
 
-    fn _default_shutdown_strategy() -> ShutdownStrategy {
-        ShutdownStrategy::Graceful
+    pub fn clone_unwrap_timeout(&self) -> DurationString {
+        self.timeout.clone().expect("failed to get timeout")
+    }
+
+    pub fn unwrap_max_concurrent(&self) -> u32 {
+        self.max_concurrent.expect("failed ot get max_concurrent")
+    }
+
+    pub fn clone_unwrap_log(&self) -> LogFile {
+        self.log.clone().expect("failed to get log")
     }
 }
 

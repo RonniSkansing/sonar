@@ -1,7 +1,4 @@
-use crate::config::{
-    Config, GrafanaConfig, LogFile, ReportOn, RequestStrategy, ServerConfig, Target,
-};
-use duration_string::DurationString;
+use crate::config::{Config, GrafanaConfig, ServerConfig, Target};
 use log::*;
 use std::fs::File;
 use std::io::prelude::*;
@@ -19,38 +16,14 @@ pub fn execute() {
         // TODO make the path default to ./sonar-dashboard.json
         dashboard_path: "/opt/sonar/dashboards/sonar.json".to_string(),
     };
-    let targets = vec![
-        Target {
-            name: String::from("example-com"),
-            url: String::from("http://example.com"),
-            interval: DurationString::from_string(String::from("1s"))
-                .expect("could not create duration string"),
-            max_concurrent: 2,
-            timeout: DurationString::from_string(String::from("5s"))
-                .expect("could not create duration string"),
-            request_strategy: RequestStrategy::Wait,
-            // shutdown_strategy: ShutdownStrategy::Graceful,
-            log: LogFile {
-                file: String::from("./log/name-example.com.log"),
-                report_on: ReportOn::Success,
-            },
-        },
-        Target {
-            name: String::from("www-example-com"),
-            url: String::from("http://example.com"),
-            interval: DurationString::from_string(String::from("1s"))
-                .expect("could not create duration string"),
-            max_concurrent: 2,
-            timeout: DurationString::from_string(String::from("5s"))
-                .expect("could not create duration string"),
-            request_strategy: RequestStrategy::Wait,
-            // shutdown_strategy: ShutdownStrategy::Graceful,
-            log: LogFile {
-                file: String::from("./log/name-example.com.log"),
-                report_on: ReportOn::Failure,
-            },
-        },
-    ];
+    let targets = vec![Target {
+        name: String::from("example-com"),
+        url: String::from("http://example.com"),
+        interval: None,
+        max_concurrent: None,
+        timeout: None,
+        log: None,
+    }];
 
     let default_config = serde_yaml::to_string(&Config {
         server,

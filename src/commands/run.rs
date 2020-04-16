@@ -6,7 +6,7 @@ use crate::utils::tokio_shutdown::{self, to_abortable_with_registration, AbortCo
 use crate::{requesters::http::HttpRequestTask, server::SonarServer};
 use log::*;
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
-use prometheus::{process_collector, Counter, Histogram, HistogramOpts, Opts, Registry};
+use prometheus::{Counter, Histogram, HistogramOpts, Opts, Registry};
 use reqwest::Client;
 use std::error::Error;
 use std::fs::File;
@@ -127,21 +127,24 @@ impl Executor {
             let (broadcast_tx, _broadcast_rx) = channel::<Result<EntryDTO, FailureDTO>>(1);
             request_result_rx.push(_broadcast_rx);
 
+            println!("{:?}", target);
             // reporters
-            // TODO replace this with a Option instead of checking file len
-            if target.log.file.len() > 0 {
-                let (abort_controller, _, syncronizer) = tokio_shutdown::new();
-                let mut file_reporter = FileReporterTask::new(
-                    target.log.file.clone(),
-                    broadcast_tx.subscribe(),
-                    syncronizer,
-                )
-                .expect("failed to create flat file reporter");
+            if target.log.is_some() {
+                let log = target.clone_unwrap_log();
+                if log.file.is_some() {
+                    let (abort_controller, _, syncronizer) = tokio_shutdown::new();
+                    let mut file_reporter = FileReporterTask::new(
+                        log.clone_unwrap_file(),
+                        broadcast_tx.subscribe(),
+                        syncronizer,
+                    )
+                    .expect("failed to create flat file reporter");
 
-                reporter_abort_controllers.push(abort_controller);
-                tokio::spawn(async move {
-                    file_reporter.run().await;
-                });
+                    reporter_abort_controllers.push(abort_controller);
+                    tokio::spawn(async move {
+                        file_reporter.run().await;
+                    });
+                }
             }
 
             // requesters

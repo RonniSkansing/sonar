@@ -45,7 +45,9 @@ impl FileReporterTask {
                 Ok(result) => match result {
                     Ok(dto) => {
                         let entry = Entry::from_dto(dto);
-                        match entry.target.log.report_on {
+                        let log = entry.target.clone_unwrap_log();
+
+                        match log.clone_unwrap_report_on() {
                             ReportOn::Success | ReportOn::Both => {
                                 let line = format!(
                                     "{} {} {}\n",
@@ -66,7 +68,9 @@ impl FileReporterTask {
                     }
                     Err(dto) => {
                         let entry = Failure::from_dto(dto);
-                        match entry.target.log.report_on {
+                        let log = entry.target.clone_unwrap_log();
+
+                        match log.clone_unwrap_report_on() {
                             ReportOn::Both | ReportOn::Failure => {
                                 let line = format!(
                                     "{} ERR {} {}\n",

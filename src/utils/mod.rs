@@ -1,3 +1,9 @@
+pub mod factory {
+    pub fn none<T>() -> Option<T> {
+        None
+    }
+}
+
 pub mod file {
     use std::fs::File;
     use std::fs::OpenOptions;
