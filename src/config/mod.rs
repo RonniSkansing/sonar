@@ -14,18 +14,13 @@ pub enum ReportOn {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LogFile {
-    #[serde(default = "factory::none", skip_serializing_if = "Option::is_none")]
-    pub file: Option<String>,
+    pub file: String,
 
     #[serde(default = "factory::none", skip_serializing_if = "Option::is_none")]
     pub report_on: Option<ReportOn>,
 }
 
 impl LogFile {
-    pub fn clone_unwrap_file(&self) -> String {
-        self.file.clone().expect("failed to get file")
-    }
-
     pub fn clone_unwrap_report_on(&self) -> ReportOn {
         self.report_on.clone().expect("failed to get report_on")
     }
@@ -77,13 +72,20 @@ impl Target {
         Some(1)
     }
 
-    pub fn hydrate(self) -> Self {
-        let name = self
-            .url
-            .replace("://", "-")
+    pub fn normalize_name(name: &String) -> String {
+        name.replace("://", "-")
             .chars()
             .map(|c| if c.is_ascii_alphabetic() { c } else { '_' })
-            .collect();
+            .collect()
+    }
+
+    pub fn hydrate(self) -> Self {
+        let name = if self.name.is_none() {
+            Self::normalize_name(&self.url)
+        } else {
+            self.name.unwrap()
+        };
+
         Self {
             url: self.url,
             interval: self.interval,

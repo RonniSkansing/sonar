@@ -1,4 +1,5 @@
-use crate::config::{Config, GrafanaConfig, ServerConfig, Target};
+use crate::config::{Config, GrafanaConfig, LogFile, ReportOn, ServerConfig, Target};
+use duration_string::DurationString;
 use log::*;
 use std::fs::File;
 use std::io::prelude::*;
@@ -6,8 +7,8 @@ use std::path::Path;
 
 const DEFAULT_CONFIG_PATH: &str = "./sonar.yaml";
 
-pub fn execute() {
-    let default_config = serde_yaml::to_string(&Config {
+pub fn minimal_config() {
+    let config = serde_yaml::to_string(&Config {
         server: None,
         grafana: None,
         targets: vec![Target {
@@ -22,9 +23,49 @@ pub fn execute() {
     })
     .expect("unexpected invalid yaml");
 
+    write(config.as_bytes());
+}
+
+pub fn maximal_config() {
+    let server = ServerConfig {
+        ip: String::from("0.0.0.0"),
+        port: 8080,
+        health_endpoint: Some(String::from("/health")),
+        prometheus_endpoint: Some(String::from("/metrics")),
+    };
+    let grafana = GrafanaConfig {
+        // TODO make the path default to ./sonar-dashboard.json
+        dashboard_json_output_path: "/opt/sonar/dashboards/sonar.json".to_string(),
+    };
+    let interval =
+        DurationString::from_string("10s".to_string()).expect("failed to create interval");
+    let timeout = DurationString::from_string("5s".to_string()).expect("failed to create timeout");
+    let log = LogFile {
+        file: "./log/example.log".to_string(),
+        report_on: Some(ReportOn::Success),
+    };
+    let url = "https://example.com".to_string();
+
+    let config = serde_yaml::to_string(&Config {
+        server: Some(server),
+        grafana: Some(grafana),
+        targets: vec![Target {
+            name: Some(Target::normalize_name(&url)),
+            url,
+            interval: Some(interval),
+            timeout: Some(timeout),
+            max_concurrent: Some(2),
+            log: Some(log),
+        }],
+    })
+    .expect("unexpected invalid yaml");
+
+    write(config.as_bytes());
+}
+
+fn write(config: &[u8]) {
     let path = Path::new(DEFAULT_CONFIG_PATH);
     let display = path.display();
-
     let mut file = match File::create(path) {
         Err(reason) => panic!(
             "failed to create config {}: {}",
@@ -33,23 +74,8 @@ pub fn execute() {
         ),
         Ok(file) => file,
     };
-    match file.write_all(default_config.as_bytes()) {
+    match file.write_all(config) {
         Err(why) => panic!("failed to write config {}: {}", display, why.to_string()),
         Ok(_) => info!("sample sonar.yaml created - Run 'sonar run' to begin monitoring"),
     }
 }
-
-// TODO full example
-/*
-let server = Some(ServerConfig {
-    ip: String::from("0.0.0.0"),
-    port: 8080,
-    health_endpoint: Some(String::from("/health")),
-    prometheus_endpoint: Some(String::from("/metrics")),
-    // TODO:  prometheus process metrics -> bool
-});
-let grafana_config = GrafanaConfig {
-    // TODO make the path default to ./sonar-dashboard.json
-    dashboard_json_output_path: "/opt/sonar/dashboards/sonar.json".to_string(),
-};
-*/

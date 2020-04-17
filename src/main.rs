@@ -79,14 +79,14 @@ fn main() {
         help: "Add a backtrace (if build with symbols)",
     };
 
-    let threads_arg = SonarArg {
+    let run_command_threads_arg = SonarArg {
         name: "threads",
         short: "t",
         takes_value: &true,
         help: "Max number of threads. The default value is the number of cores available to the system.",
     };
 
-    let config_arg = SonarArg {
+    let run_command_config_arg = SonarArg {
         name: "config",
         short: "c",
         takes_value: &true,
@@ -106,6 +106,13 @@ fn main() {
         help: "Inits a new project in the current directory",
     };
 
+    let init_command_full_arg = SonarArg {
+        name: "full",
+        short: "f",
+        takes_value: &false,
+        help: "Output a config with all available settings",
+    };
+
     let run_command = SonarCommand {
         name: "run",
         about: "runs the project",
@@ -118,12 +125,16 @@ fn main() {
         .version(sonar.version)
         .author(sonar.author)
         .about(sonar.about)
-        .subcommand(init_command.into_clap())
+        .subcommand(
+            init_command
+                .into_clap()
+                .arg(init_command_full_arg.into_clap()),
+        )
         .subcommand(
             run_command
                 .into_clap()
-                .arg(threads_arg.into_clap())
-                .arg(config_arg.into_clap()),
+                .arg(run_command_threads_arg.into_clap())
+                .arg(run_command_config_arg.into_clap()),
         )
         .subcommand(
             SubCommand::with_name("autocomplete")
@@ -143,7 +154,7 @@ fn main() {
     // config debug
     let is_debug = matches.is_present(debug_arg.name);
     if is_debug {
-        //std::env::set_var("RUST_BACKTRACE", "full");
+        std::env::set_var("RUST_BACKTRACE", "full");
     }
 
     // setup logger
@@ -171,8 +182,13 @@ fn main() {
 
     // run command
     match matches.subcommand() {
-        // TODO add arg --grafana -g to add the grafana dashboard path, default to ./sonar.json
-        (name, Some(_)) if name == init_command.name => commands::init::execute(),
+        (name, Some(matches)) if name == init_command.name => {
+            if !matches.args.get(init_command_full_arg.name).is_some() {
+                commands::init::minimal_config()
+            } else {
+                commands::init::maximal_config()
+            }
+        }
 
         // TODO use Some(submatches) instead of manually pulling out of subcommand_matches
         (name, Some(_)) if name == run_command.name => {
@@ -182,7 +198,7 @@ fn main() {
 
             // setup runtime
             let mut runtime_builder = runtime::Builder::new();
-            let threads_arg_match = subcommand_matches.args.get(threads_arg.name);
+            let threads_arg_match = subcommand_matches.args.get(run_command_threads_arg.name);
             if threads_arg_match.is_some() {
                 let v = threads_arg_match.unwrap();
                 let n: usize = v.vals[0]
@@ -201,7 +217,8 @@ fn main() {
                 .build()
                 .expect("Failed to build runtime");
 
-            let default_config_path_match = subcommand_matches.args.get(config_arg.name);
+            let default_config_path_match =
+                subcommand_matches.args.get(run_command_config_arg.name);
             let default_config_path = if default_config_path_match.is_some() {
                 let v = default_config_path_match.expect("failed to get default_config_path match");
                 v.vals[0]

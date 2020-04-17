@@ -131,20 +131,15 @@ impl Executor {
             // reporters
             if target.log.is_some() {
                 let log = target.clone_unwrap_log();
-                if log.file.is_some() {
-                    let (abort_controller, _, syncronizer) = tokio_shutdown::new();
-                    let mut file_reporter = FileReporterTask::new(
-                        log.clone_unwrap_file(),
-                        broadcast_tx.subscribe(),
-                        syncronizer,
-                    )
-                    .expect("failed to create flat file reporter");
+                let (abort_controller, _, syncronizer) = tokio_shutdown::new();
+                let mut file_reporter =
+                    FileReporterTask::new(log.file, broadcast_tx.subscribe(), syncronizer)
+                        .expect("failed to create flat file reporter");
 
-                    reporter_abort_controllers.push(abort_controller);
-                    tokio::spawn(async move {
-                        file_reporter.run().await;
-                    });
-                }
+                reporter_abort_controllers.push(abort_controller);
+                tokio::spawn(async move {
+                    file_reporter.run().await;
+                });
             }
 
             // requesters
