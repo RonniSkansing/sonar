@@ -267,7 +267,7 @@ impl Executor {
         match file.write_all(to_prometheus_grafana(&config).as_bytes()) {
             Ok(_) => (),
             Err(err) => {
-                error!("Failed to create grafana dashboard file: {}", err);
+                error!("Failed to write grafana dashboard file: {}", err);
                 return;
             }
         }

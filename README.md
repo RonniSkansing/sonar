@@ -14,5 +14,3 @@
   - Job: Grafana metrics added to exporter client
 
 * TODO
-* add min and max param to init command, one makes a minimal config the other a max.
-  ...

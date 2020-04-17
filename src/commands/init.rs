@@ -34,14 +34,13 @@ pub fn maximal_config() {
         prometheus_endpoint: Some(String::from("/metrics")),
     };
     let grafana = GrafanaConfig {
-        // TODO make the path default to ./sonar-dashboard.json
         dashboard_json_output_path: "/opt/sonar/dashboards/sonar.json".to_string(),
     };
     let interval =
         DurationString::from_string("10s".to_string()).expect("failed to create interval");
     let timeout = DurationString::from_string("5s".to_string()).expect("failed to create timeout");
     let log = LogFile {
-        file: "./log/example.log".to_string(),
+        file: "./log/https-example-com.log".to_string(),
         report_on: Some(ReportOn::Success),
     };
     let url = "https://example.com".to_string();

@@ -27,6 +27,8 @@ use simplelog::*;
 use std::path::PathBuf;
 use tokio::runtime;
 
+const APP_NAME: &str = "sonar";
+
 struct Application<'a> {
     name: &'a str,
     author: &'a str,
@@ -66,7 +68,7 @@ impl SonarArg<'_> {
 
 fn main() {
     let sonar = Application {
-        name: "Sonar",
+        name: APP_NAME,
         author: "",
         version: "0.0.0",
         about: "Portable monitoring",
@@ -148,7 +150,6 @@ fn main() {
         );
 
     let mut app_clone = app.clone();
-
     let matches = app.get_matches();
 
     // config debug
@@ -238,7 +239,7 @@ fn main() {
                 .expect("unable to get value of SHELL")
                 .parse()
                 .expect("unable to match SHELL");
-            app_clone.gen_completions_to("sonar", shell, &mut std::io::stdout());
+            app_clone.gen_completions_to(APP_NAME, shell, &mut std::io::stdout());
         }
         (_, _) => {
             app_clone
