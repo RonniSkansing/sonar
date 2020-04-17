@@ -189,16 +189,10 @@ fn main() {
                 commands::init::maximal_config()
             }
         }
-
-        // TODO use Some(submatches) instead of manually pulling out of subcommand_matches
-        (name, Some(_)) if name == run_command.name => {
-            let subcommand_matches = matches
-                .subcommand_matches(run_command.name)
-                .expect("Could not get run command arguments");
-
+        (name, Some(matches)) if name == run_command.name => {
             // setup runtime
             let mut runtime_builder = runtime::Builder::new();
-            let threads_arg_match = subcommand_matches.args.get(run_command_threads_arg.name);
+            let threads_arg_match = matches.args.get(run_command_threads_arg.name);
             if threads_arg_match.is_some() {
                 let v = threads_arg_match.unwrap();
                 let n: usize = v.vals[0]
@@ -217,8 +211,7 @@ fn main() {
                 .build()
                 .expect("Failed to build runtime");
 
-            let default_config_path_match =
-                subcommand_matches.args.get(run_command_config_arg.name);
+            let default_config_path_match = matches.args.get(run_command_config_arg.name);
             let default_config_path = if default_config_path_match.is_some() {
                 let v = default_config_path_match.expect("failed to get default_config_path match");
                 v.vals[0]
