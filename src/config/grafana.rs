@@ -83,7 +83,7 @@ pub fn panel_from_target(id: u32, target: &Target) -> Panel {
         let prometheus_metric_name = format!(
             "histogram_quantile(0.{}, sum(rate({}_time_ms_bucket[5m])) by (le))",
             n_string,
-            prometheus::normalize_name(target.name.to_string())
+            prometheus::normalize_name(target.clone_unwrap_name())
         );
 
         panel_targets.push(PanelTarget {
@@ -139,7 +139,7 @@ pub fn panel_from_target(id: u32, target: &Target) -> Panel {
         time_from: None,
         time_regions: Some(Vec::new()),
         time_shift: None,
-        title: Some(target.name.clone()),
+        title: Some(target.clone_unwrap_name()),
         tooltip: Some(ToolTip {
             shared: Some(true),
             sort: Some(0),

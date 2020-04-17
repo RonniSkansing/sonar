@@ -178,7 +178,8 @@ impl Executor {
         let registry = Registry::new();
 
         for target in &targets {
-            let counter_success_name = util_prometheus::counter_success_name(target.name.clone());
+            let counter_success_name =
+                util_prometheus::counter_success_name(target.clone_unwrap_name());
             let counter_success = Counter::with_opts(Opts::new(
                 counter_success_name.clone(),
                 String::from("Number of successful requests"),
@@ -186,7 +187,7 @@ impl Executor {
             .expect("failed to create success counter");
             counters.insert(counter_success_name.clone(), counter_success.clone());
 
-            let timer_name = util_prometheus::timer_name(target.name.clone());
+            let timer_name = util_prometheus::timer_name(target.clone_unwrap_name());
             let request_time_opts =
                 HistogramOpts::new(timer_name.clone(), String::from("latency in ms"))
                     // TODO replace with bucket in target
@@ -219,18 +220,20 @@ impl Executor {
                             Ok(r) => {
                                 counters
                                     .get(&util_prometheus::counter_success_name(
-                                        r.target.name.clone(),
+                                        r.target.clone_unwrap_name(),
                                     ))
                                     .expect("could not find success counter by key")
                                     .inc();
                                 timers
-                                    .get(&util_prometheus::timer_name(r.target.name.clone()))
+                                    .get(&util_prometheus::timer_name(r.target.clone_unwrap_name()))
                                     .expect("could not find timer by key")
                                     .observe(r.latency as f64);
                             }
                             Err(err) => {
                                 timers
-                                    .get(&util_prometheus::timer_name(err.target.name.clone()))
+                                    .get(&util_prometheus::timer_name(
+                                        err.target.clone_unwrap_name(),
+                                    ))
                                     .expect("could not find timer by name")
                                     .observe(err.latency as f64);
                             }
@@ -257,9 +260,9 @@ impl Executor {
         };
         info!(
             "Writting grafana dashboard to {}",
-            grafana_config.dashboard_path
+            grafana_config.dashboard_json_output_path
         );
-        let mut file = match File::create(grafana_config.dashboard_path) {
+        let mut file = match File::create(grafana_config.dashboard_json_output_path) {
             Ok(f) => f,
             Err(err) => {
                 error!("Failed to create grafana dashboard file: {}", err);

@@ -5,22 +5,6 @@ use strum_macros::Display;
 
 pub mod grafana;
 
-// The strategy determins how requesting will be processed when the requester is asked
-// to do more requests concurrently then the max.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
-pub enum RequestStrategy {
-    // do not send a new request before one of the current requests are done
-    Wait,
-    // cancel the longest living unfinished request and start a new one immediatly
-    CancelOldest,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
-pub enum ShutdownStrategy {
-    Graceful,
-    Forceful,
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
 pub enum ReportOn {
     Success,
@@ -49,7 +33,8 @@ impl LogFile {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Target {
-    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     pub url: String,
     // how often a request should happen
     #[serde(
@@ -92,6 +77,27 @@ impl Target {
         Some(1)
     }
 
+    pub fn hydrate(self) -> Self {
+        let name = self
+            .url
+            .replace("://", "-")
+            .chars()
+            .map(|c| if c.is_ascii_alphabetic() { c } else { '_' })
+            .collect();
+        Self {
+            url: self.url,
+            interval: self.interval,
+            name: Some(name),
+            timeout: self.timeout,
+            max_concurrent: self.max_concurrent,
+            log: self.log,
+        }
+    }
+
+    pub fn clone_unwrap_name(&self) -> String {
+        self.name.clone().expect("failed to get name")
+    }
+
     pub fn clone_unwrap_interval(&self) -> DurationString {
         self.interval.clone().expect("failed to get timeout")
     }
@@ -122,12 +128,14 @@ pub struct ServerConfig {
 //
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GrafanaConfig {
-    pub dashboard_path: String,
+    pub dashboard_json_output_path: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub server: Option<ServerConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub grafana: Option<GrafanaConfig>,
     pub targets: Vec<Target>,
 }
