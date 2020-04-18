@@ -1,7 +1,8 @@
 pub mod http {
-    use crate::config::Target;
-    use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
-    use crate::utils::tokio_shutdown::Syncronizer;
+    use crate::{
+        config::Target,
+        messages::{Entry, EntryDTO, Failure, FailureDTO},
+    };
     use atomic::AtomicU32;
     use chrono::Utc;
     use duration_string::DurationString;
@@ -14,38 +15,27 @@ pub mod http {
     pub struct HttpRequestTask {
         client: Client,
         broadcaster: broadcast::Sender<Result<EntryDTO, FailureDTO>>,
-        shutdown_sync: Syncronizer,
     }
 
     impl HttpRequestTask {
         pub fn new(
             client: Client,
             broadcaster: broadcast::Sender<Result<EntryDTO, FailureDTO>>,
-            shutdown_notifer: Syncronizer,
         ) -> Self {
             Self {
                 client: client,
                 broadcaster: broadcaster,
-                shutdown_sync: shutdown_notifer,
             }
         }
 
-        pub async fn run(mut self, target: Target) {
+        pub async fn run(self, target: Target) {
             debug!("Starting requester for {}", target.url);
             let mut interval =
                 tokio::time::interval(DurationString::from(target.clone_unwrap_interval()).into());
             interval.tick().await;
             let currently_running = std::sync::Arc::from(AtomicU32::new(0));
-            loop {
-                // TODO bug, this only starts to hear about a graceful shutdown
-                // on next request iteration.. imaging there was 200s between,
-                // it would take forever
-                if self.shutdown_sync.should_stop() {
-                    info!("graceful shutdown of requests to {}", target.url);
-                    self.shutdown_sync.done().await;
-                    break;
-                }
 
+            loop {
                 if currently_running.load(Ordering::SeqCst) >= target.unwrap_max_concurrent() {
                     warn!("HTTP GET - {} - Responses are not delivered in time for more concurrent requests. Skipping a request", target.url);
                     interval.tick().await;

@@ -2,7 +2,6 @@ use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
 use crate::{config::ReportOn, utils::file::Append};
 use log::*;
 
-use crate::utils::tokio_shutdown::Syncronizer;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
@@ -11,14 +10,12 @@ use tokio::sync::broadcast;
 pub struct FileReporterTask {
     file: File,
     receiver: broadcast::Receiver<Result<EntryDTO, FailureDTO>>,
-    _shutdown_sync: Syncronizer,
 }
 
 impl FileReporterTask {
     pub fn new(
         location: String,
         receiver: broadcast::Receiver<Result<EntryDTO, FailureDTO>>,
-        _shutdown_sync: Syncronizer,
     ) -> Result<FileReporterTask, std::io::Error> {
         let file_path = Path::new(&location);
         let path = file_path
@@ -35,7 +32,6 @@ impl FileReporterTask {
         Ok(FileReporterTask {
             file: file,
             receiver,
-            _shutdown_sync,
         })
     }
 

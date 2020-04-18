@@ -10,8 +10,7 @@ use grafana_dashboard::TimePicker;
 use grafana_dashboard::Variables;
 use serde_json;
 
-// TODO an this be a into trait impl?
-pub fn to_prometheus_grafana(config: &Config) -> String {
+pub fn to_grafana_dashboard_json(config: &Config) -> String {
     let mut panels: Vec<Panel> = Vec::new();
     let mut panel_id = 1;
 

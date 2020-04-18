@@ -1,9 +1,9 @@
-use crate::config::{grafana::to_prometheus_grafana, Config, Target};
+use crate::config::{grafana::to_grafana_dashboard_json, Config, Target};
 use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporterTask;
 use crate::utils::prometheus as util_prometheus;
-use crate::utils::tokio_shutdown::{self, to_abortable_with_registration, AbortController};
 use crate::{requesters::http::HttpRequestTask, server::SonarServer};
+use futures::future::{AbortHandle, Abortable};
 use log::*;
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use prometheus::{Counter, Histogram, HistogramOpts, Opts, Registry};
@@ -24,8 +24,8 @@ pub struct Executor {
     graceful_shutdown_complete_receiver: Option<oneshot::Receiver<()>>,
     server_running: bool,
     prometheus_registry: Option<Registry>,
-    requester_abort_controllers: Option<Vec<AbortController>>,
-    reporter_abort_controllers: Option<Vec<AbortController>>,
+    requester_abort_controllers: Option<Vec<AbortHandle>>,
+    reporter_abort_controllers: Option<Vec<AbortHandle>>,
 }
 
 impl Executor {
@@ -78,17 +78,8 @@ impl Executor {
         }
     }
 
-    async fn stop_all(&mut self, abort_controllers: Vec<AbortController>) {
-        let mut join_handles = Vec::new();
-        for c in abort_controllers {
-            join_handles.push(tokio::spawn(async {
-                let _ = c.shutdown_gracefully().await;
-            }));
-        }
-
-        for jh in join_handles.drain(..) {
-            let _ = jh.await;
-        }
+    async fn stop_all(&mut self, abort_controllers: Vec<AbortHandle>) {
+        abort_controllers.iter().for_each(|a| a.abort());
     }
 
     async fn stop_reporters(&mut self) {
@@ -119,8 +110,8 @@ impl Executor {
         self.stop_reporters().await;
         self.stop_requesters().await;
 
-        let mut requester_abort_controllers = Vec::new();
-        let mut reporter_abort_controllers = Vec::new();
+        let mut requester_abort_handles = Vec::new();
+        let mut reporter_abort_handles = Vec::new();
         let mut request_result_rx = Vec::new();
         for target in targets {
             // TODO set the capacity to be number of concurrent requests?
@@ -131,28 +122,30 @@ impl Executor {
             // reporters
             if target.log.is_some() {
                 let log = target.clone_unwrap_log();
-                let (abort_controller, _, syncronizer) = tokio_shutdown::new();
-                let mut file_reporter =
-                    FileReporterTask::new(log.file, broadcast_tx.subscribe(), syncronizer)
-                        .expect("failed to create flat file reporter");
+                let mut file_reporter = FileReporterTask::new(log.file, broadcast_tx.subscribe())
+                    .expect("failed to create flat file reporter");
 
-                reporter_abort_controllers.push(abort_controller);
-                tokio::spawn(async move {
-                    file_reporter.run().await;
-                });
+                let (abort_handle, abort_registration) = AbortHandle::new_pair();
+                reporter_abort_handles.push(abort_handle);
+                tokio::spawn(Abortable::new(
+                    async move {
+                        file_reporter.run().await;
+                    },
+                    abort_registration,
+                ));
             }
-
             // requesters
-            let (abort_controller, abort_reg, syncronizer) = tokio_shutdown::new();
-            let requester =
-                HttpRequestTask::new(self.http_client.clone(), broadcast_tx, syncronizer);
-            requester_abort_controllers.push(abort_controller);
-            tokio::spawn(to_abortable_with_registration(abort_reg, async move {
-                requester.run(target).await;
-            }));
+            let requester = HttpRequestTask::new(self.http_client.clone(), broadcast_tx);
+            let (abort_handle, abort_registration) = AbortHandle::new_pair();
+            requester_abort_handles.push(abort_handle);
+            tokio::spawn(Abortable::new(
+                async move {
+                    requester.run(target).await;
+                },
+                abort_registration,
+            ));
         }
-
-        self.requester_abort_controllers = Some(requester_abort_controllers);
+        self.requester_abort_controllers = Some(requester_abort_handles);
 
         request_result_rx
     }
@@ -162,12 +155,6 @@ impl Executor {
         targets: Vec<Target>,
         receivers: Vec<broadcast::Receiver<Result<EntryDTO, FailureDTO>>>,
     ) {
-        // TODO implement
-        // let _process_data = process_collector::ProcessCollector::for_self();
-        // registry
-        //     .register(Box::new(process_data))
-        //     .expect("failed to register process info to registry");
-
         let mut timers: HashMap<String, Histogram> = HashMap::new();
         let mut counters: HashMap<String, Counter> = HashMap::new();
         let registry = Registry::new();
@@ -264,7 +251,7 @@ impl Executor {
                 return;
             }
         };
-        match file.write_all(to_prometheus_grafana(&config).as_bytes()) {
+        match file.write_all(to_grafana_dashboard_json(&config).as_bytes()) {
             Ok(_) => (),
             Err(err) => {
                 error!("Failed to write grafana dashboard file: {}", err);
@@ -365,7 +352,7 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
                     }
                     println!("Not implemtented: handle deleted config");
                 }
-                _ => (), // debug!("got unknown event"),
+                _ => (),
             },
             Err(err) => panic!("Failed to listen to config changes: {}", err.to_string()),
         }
