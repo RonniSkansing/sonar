@@ -227,13 +227,11 @@ fn main() {
             debug!("config path: {}", default_config_path);
 
             runtime
-                .block_on(commands::run::execute(
+                .block_on(commands::run::Executor::watch_config_and_handle(
                     PathBuf::from(default_config_path.clone()),
                     Client::new(),
                 ))
-                .unwrap_or_else(|e| {
-                    error!("Failed to run {}", e.to_string());
-                });
+                .expect("failed to block on run command");
         }
         ("autocomplete", Some(sub_matches)) => {
             let shell: Shell = sub_matches

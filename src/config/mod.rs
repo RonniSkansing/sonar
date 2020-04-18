@@ -15,7 +15,6 @@ pub enum ReportOn {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LogFile {
     pub file: String,
-
     #[serde(
         default = "LogFile::some_default_report_on",
         skip_serializing_if = "Option::is_none"

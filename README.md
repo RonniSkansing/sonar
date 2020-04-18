@@ -16,7 +16,6 @@
 * TODO
 
 - TODO's
-- Implement Async file writers
 - init from file with a domain per line
 - Implement webhooks for success / failure
 - Implement rest endpoint for reading log

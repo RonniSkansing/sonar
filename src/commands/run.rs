@@ -32,6 +32,58 @@ pub struct Executor {
 }
 
 impl Executor {
+    pub async fn watch_config_and_handle<'a>(
+        config_file_path: PathBuf,
+        client: Client,
+    ) -> Result<(), Box<dyn Error>> {
+        let (abs_path_to_config_file, abs_path_to_config_folder) =
+            to_absolute_pair(config_file_path.clone()).await;
+
+        let (tx, rx) = std::sync::mpsc::channel::<DebouncedEvent>();
+        let mut config_watcher = watcher(tx, std::time::Duration::from_millis(100))
+            .expect("failed to create config watcher");
+
+        config_watcher
+            .watch(
+                abs_path_to_config_folder.clone(),
+                RecursiveMode::NonRecursive,
+            )
+            .expect("failed to watch config root folder");
+
+        // handle initial start run
+        let mut executor = Executor::new(client);
+        executor.handle(abs_path_to_config_file.clone()).await;
+        debug!(
+            "watching for config changes in {}",
+            abs_path_to_config_folder
+                .to_str()
+                .expect("failed to stringify abs config folder path")
+        );
+
+        // handle when changes are made to the config file
+        loop {
+            match rx.recv() {
+                Ok(event) => match event {
+                    DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
+                        if !path.eq(&abs_path_to_config_file) {
+                            continue;
+                        }
+                        executor.handle(abs_path_to_config_file.clone()).await;
+                    }
+                    DebouncedEvent::Remove(path) => {
+                        if !path.eq(&abs_path_to_config_file) {
+                            executor.stop_all().await;
+                            continue;
+                        }
+                        println!("Not implemtented: handle deleted config");
+                    }
+                    _ => (),
+                },
+                Err(err) => panic!("Failed to listen to config changes: {}", err.to_string()),
+            }
+        }
+    }
+
     pub fn new(http_client: Client) -> Self {
         Self {
             http_client,
@@ -50,18 +102,18 @@ impl Executor {
         {
             Ok(v) => v,
             Err(err) => {
-                error!("Config file missing - run 'sonar init' to create one and check that the path is correct. You can add the file without stopping the program. For more debug - enable '-d' debug flag for more info. ");
-                debug!("Error: {}", err);
+                error!("config file missing - run 'sonar init' to create one and check that the path is correct. You can add the file without stopping the program. For more debug - enable '-d' debug flag for more info. ");
+                debug!("error: {}", err);
                 return;
             }
         };
         match serde_yaml::from_str::<Config>(&config_str) {
             Err(err) => {
-                error!("Invalid config - Please fix: {}", err);
+                error!("invalid config - Please fix: {}", err);
                 return;
             }
             Ok(config) => {
-                info!("Config loaded");
+                info!("config loaded");
 
                 self.handle_grafana_dashboard(config.clone()).await;
                 let request_data_receivers = self.handle_requesters(config.targets.clone()).await;
@@ -128,7 +180,6 @@ impl Executor {
             let (broadcast_tx, _broadcast_rx) = channel::<Result<EntryDTO, FailureDTO>>(1);
             request_result_rx.push(_broadcast_rx);
 
-            println!("{:?}", target);
             // reporters
             if target.log.is_some() {
                 let log = target.clone_unwrap_log();
@@ -218,7 +269,7 @@ impl Executor {
             let counters = counters.clone();
             tokio::spawn(async move {
                 loop {
-                    debug!("Started prometheus metrics receiver");
+                    debug!("started prometheus metrics receiver");
                     match r.recv().await {
                         Ok(m) => match m {
                             Ok(r) => {
@@ -245,12 +296,12 @@ impl Executor {
                         Err(err) => {
                             match err {
                                 RecvError::Closed => {
-                                    debug!("Stopped prometheus metrics receiver: {}", err);
+                                    debug!("stopped prometheus metrics receiver: {}", err);
                                     break;
                                 }
                                 RecvError::Lagged(n) => {
                                     warn!(
-                                        "Prometheus metrics receiver is lagging behind with: {}",
+                                        "prometheus metrics receiver is lagging behind with: {}",
                                         n
                                     );
                                 }
@@ -270,18 +321,18 @@ impl Executor {
         let grafana_config = match config.clone().grafana {
             Some(p) => p,
             None => {
-                error!("Missing grafana config");
+                error!("missing grafana config");
                 return;
             }
         };
         info!(
-            "Writting grafana dashboard to {}",
+            "outputting grafana dashboard json to {}",
             grafana_config.dashboard_json_output_path
         );
         let mut file = match File::create(grafana_config.dashboard_json_output_path).await {
             Ok(f) => f,
             Err(err) => {
-                error!("Failed to create grafana dashboard file: {}", err);
+                error!("failed to create grafana dashboard file: {}", err);
                 return;
             }
         };
@@ -291,14 +342,13 @@ impl Executor {
         {
             Ok(_) => (),
             Err(err) => {
-                error!("Failed to write grafana dashboard file: {}", err);
+                error!("failed to write grafana dashboard file: {}", err);
                 return;
             }
         }
     }
 
     async fn start_server(&mut self, config: Config) {
-        // start server
         let config = config.server.expect("failed to unwrap server config");
         let mut server = SonarServer::new(config, self.prometheus_registry.take());
         let (server_kill_sender, graceful_shutdown_complete_receiver) = server.start();
@@ -310,7 +360,7 @@ impl Executor {
         let kill_signal = self.server_kill_sender.take();
         let graceful_shutdown_complete_receiver = self.graceful_shutdown_complete_receiver.take();
         if kill_signal.is_some() {
-            info!("Waiting for graceful server shutdown");
+            info!("waiting for graceful server shutdown");
             kill_signal
                 .expect("failed to get server kill signal sender")
                 .send(())
@@ -332,50 +382,5 @@ impl Executor {
         }
         self.start_server(config).await;
         self.server_running = true;
-    }
-}
-
-pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<(), Box<dyn Error>> {
-    let (abs_path_to_config_file, abs_path_to_config_folder) =
-        to_absolute_pair(config_file_path.clone()).await;
-    debug!(
-        "Watching for config changes in {}",
-        abs_path_to_config_folder
-            .to_str()
-            .expect("failed to stringify abs config folder path")
-    );
-
-    let (tx, rx) = std::sync::mpsc::channel::<DebouncedEvent>();
-    let mut config_watcher = watcher(tx, std::time::Duration::from_millis(100))
-        .expect("failed to create config watcher");
-
-    config_watcher
-        .watch(abs_path_to_config_folder, RecursiveMode::NonRecursive)
-        .expect("failed to watch config root folder");
-
-    // handle initial start run
-    let mut executor = Executor::new(client);
-    executor.handle(abs_path_to_config_file.clone()).await;
-    // handle when changes are made to the config file
-    loop {
-        match rx.recv() {
-            Ok(event) => match event {
-                DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
-                    if !path.eq(&abs_path_to_config_file) {
-                        continue;
-                    }
-                    executor.handle(abs_path_to_config_file.clone()).await;
-                }
-                DebouncedEvent::Remove(path) => {
-                    if !path.eq(&abs_path_to_config_file) {
-                        executor.stop_all().await;
-                        continue;
-                    }
-                    println!("Not implemtented: handle deleted config");
-                }
-                _ => (),
-            },
-            Err(err) => panic!("Failed to listen to config changes: {}", err.to_string()),
-        }
     }
 }
