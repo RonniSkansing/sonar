@@ -46,8 +46,9 @@ impl FileReporterTask {
                         match log.clone_unwrap_report_on() {
                             ReportOn::Success | ReportOn::Both => {
                                 let line = format!(
-                                    "{} {} {}\n",
+                                    "{} {}ms {} {}\n",
                                     entry.time.timestamp(),
+                                    entry.latency,
                                     entry.response_code,
                                     entry.target.url
                                 );
@@ -59,8 +60,7 @@ impl FileReporterTask {
                                     }
                                 }
                             }
-                            // TODO what is happning here?
-                            ReportOn::Failure => (),
+                            _ => (),
                         }
                     }
                     Err(dto) => {
@@ -70,9 +70,10 @@ impl FileReporterTask {
                         match log.clone_unwrap_report_on() {
                             ReportOn::Both | ReportOn::Failure => {
                                 let line = format!(
-                                    "{} ERR {} {}\n",
+                                    "{} Failed {}ms {} {}\n",
                                     entry.time.timestamp(),
                                     entry.target.url,
+                                    entry.latency,
                                     entry.reason.trim()
                                 );
                                 match self.file.write((line).as_bytes()) {
@@ -83,7 +84,7 @@ impl FileReporterTask {
                                     }
                                 }
                             }
-                            ReportOn::Success => (),
+                            _ => (),
                         }
                     }
                 },

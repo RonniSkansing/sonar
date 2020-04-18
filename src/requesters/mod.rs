@@ -83,7 +83,8 @@ pub mod http {
                                 target.clone(),
                             );
                             info!(
-                                "Request failure\t{}\t{}",
+                                "Request failure\t{}ms\t{}\t{}",
+                                latency_millis,
                                 target.url.clone(),
                                 err.to_string()
                             );
