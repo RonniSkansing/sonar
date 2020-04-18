@@ -184,10 +184,12 @@ fn main() {
     // run command
     match matches.subcommand() {
         (name, Some(matches)) if name == init_command.name => {
+            let mut rt =
+                tokio::runtime::Runtime::new().expect("failed to start default tokio runtime");
             if !matches.args.get(init_command_full_arg.name).is_some() {
-                commands::init::minimal_config()
+                rt.block_on(commands::init::minimal_config());
             } else {
-                commands::init::maximal_config()
+                rt.block_on(commands::init::maximal_config());
             }
         }
         (name, Some(matches)) if name == run_command.name => {

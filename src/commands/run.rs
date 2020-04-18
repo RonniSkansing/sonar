@@ -336,7 +336,7 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
         "Watching for changes in {}",
         watch_root
             .to_str()
-            .expect("could not unwrap watch_roo to str")
+            .expect("could not unwrap watch_root to str")
     );
 
     let (tx, rx) = std::sync::mpsc::channel::<DebouncedEvent>();
@@ -374,7 +374,6 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
     }
 }
 
-// todo seems bloaty
 fn is_config_file(path: &PathBuf, config_path: &PathBuf) -> bool {
     path.eq(config_path)
 }

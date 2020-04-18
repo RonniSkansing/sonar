@@ -3,13 +3,12 @@ use crate::config::{
 };
 use duration_string::DurationString;
 use log::*;
-use std::fs::File;
-use std::io::prelude::*;
 use std::path::Path;
+use tokio::prelude::*;
 
 const DEFAULT_CONFIG_PATH: &str = "./sonar.yaml";
 
-pub fn minimal_config() {
+pub async fn minimal_config() {
     let config = serde_yaml::to_string(&Config {
         server: None,
         grafana: None,
@@ -27,10 +26,10 @@ pub fn minimal_config() {
     })
     .expect("unexpected invalid yaml");
 
-    write(config.as_bytes());
+    write(config.as_bytes()).await;
 }
 
-pub fn maximal_config() {
+pub async fn maximal_config() {
     let server = ServerConfig {
         ip: String::from("0.0.0.0"),
         port: 8080,
@@ -65,22 +64,23 @@ pub fn maximal_config() {
     })
     .expect("unexpected invalid yaml");
 
-    write(config.as_bytes());
+    write(config.as_bytes()).await;
 }
 
-fn write(config: &[u8]) {
+async fn write(config: &[u8]) {
     let path = Path::new(DEFAULT_CONFIG_PATH);
     let display = path.display();
-    let mut file = match File::create(path) {
+
+    let mut file = match tokio::fs::File::create(path).await {
+        Ok(file) => file,
         Err(reason) => panic!(
             "failed to create config {}: {}",
             display,
             reason.to_string()
         ),
-        Ok(file) => file,
     };
-    match file.write_all(config) {
-        Err(why) => panic!("failed to write config {}: {}", display, why.to_string()),
+    match file.write_all(config).await {
         Ok(_) => info!("sample sonar.yaml created - Run 'sonar run' to begin monitoring"),
+        Err(err) => error!("failed to create config: {}", err.to_string()),
     }
 }
