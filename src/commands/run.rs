@@ -1,7 +1,7 @@
 use crate::config::{grafana::to_grafana_dashboard_json, Config, Target, TargetDefault};
 use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporterTask;
-use crate::utils::prometheus as util_prometheus;
+use crate::utils::{file::read_to_string, prometheus as util_prometheus};
 use crate::{requesters::http::HttpRequestTask, server::SonarServer};
 use broadcast::RecvError;
 use futures::future::{AbortHandle, Abortable};
@@ -10,11 +10,7 @@ use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use prometheus::{Counter, Histogram, HistogramOpts, Opts, Registry};
 use reqwest::Client;
 use std::error::Error;
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{collections::HashMap, path::PathBuf, time::Duration};
 use tokio::fs::File;
 use tokio::{
     prelude::*,
@@ -379,13 +375,13 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
         match rx.recv() {
             Ok(event) => match event {
                 DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
-                    if !is_config_file(&path, &abs_config_path) {
+                    if !path.eq(&abs_config_path) {
                         continue;
                     }
                     executor.handle(abs_config_path.clone()).await;
                 }
                 DebouncedEvent::Remove(path) => {
-                    if !is_config_file(&path, &abs_config_path) {
+                    if !path.eq(&abs_config_path) {
                         executor.stop_all().await;
                         continue;
                     }
@@ -396,16 +392,4 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
             Err(err) => panic!("Failed to listen to config changes: {}", err.to_string()),
         }
     }
-}
-
-fn is_config_file(path: &PathBuf, config_path: &PathBuf) -> bool {
-    path.eq(config_path)
-}
-
-async fn read_to_string(file: &str) -> Result<String, tokio::io::Error> {
-    let path = Path::new(file);
-    let mut f = File::open(path).await?;
-    let mut c = String::new();
-    f.read_to_string(&mut c).await?;
-    Ok(c)
 }

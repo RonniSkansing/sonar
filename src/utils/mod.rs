@@ -9,6 +9,15 @@ pub mod file {
     use std::path::Path;
     use tokio::fs::File;
     use tokio::fs::OpenOptions;
+    use tokio::prelude::*;
+
+    pub async fn read_to_string(file: &str) -> Result<String, tokio::io::Error> {
+        let path = Path::new(file);
+        let mut f = File::open(path).await?;
+        let mut c = String::new();
+        f.read_to_string(&mut c).await?;
+        Ok(c)
+    }
 
     #[async_trait(?Send)]
     pub trait Append {
