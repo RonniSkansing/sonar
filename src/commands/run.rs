@@ -9,14 +9,15 @@ use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use prometheus::{Counter, Histogram, HistogramOpts, Opts, Registry};
 use reqwest::Client;
 use std::error::Error;
-use std::fs::File;
-use std::io::prelude::*;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
-use tokio::sync::broadcast;
-use tokio::sync::{broadcast::channel, oneshot};
+use tokio::fs::File;
+use tokio::{
+    prelude::*,
+    sync::{broadcast, broadcast::channel, oneshot},
+};
 
 pub struct Executor {
     http_client: Client,
@@ -42,7 +43,9 @@ impl Executor {
     }
 
     pub async fn handle(&mut self, config_path: PathBuf) {
-        let config_str = match read_to_string(config_path.to_string_lossy().to_string().as_str()) {
+        let config_str = match read_to_string(config_path.to_string_lossy().to_string().as_str())
+            .await
+        {
             Ok(v) => v,
             Err(err) => {
                 error!("Config file missing - run 'sonar init' to create one and check that the path is correct. You can add the file without stopping the program. For more debug - enable '-d' debug flag for more info. ");
@@ -128,6 +131,7 @@ impl Executor {
             if target.log.is_some() {
                 let log = target.clone_unwrap_log();
                 let mut file_reporter = FileReporterTask::new(log.file, broadcast_tx.subscribe())
+                    .await
                     .expect("failed to create flat file reporter");
 
                 let (abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -259,14 +263,17 @@ impl Executor {
             "Writting grafana dashboard to {}",
             grafana_config.dashboard_json_output_path
         );
-        let mut file = match File::create(grafana_config.dashboard_json_output_path) {
+        let mut file = match File::create(grafana_config.dashboard_json_output_path).await {
             Ok(f) => f,
             Err(err) => {
                 error!("Failed to create grafana dashboard file: {}", err);
                 return;
             }
         };
-        match file.write_all(to_grafana_dashboard_json(&config).as_bytes()) {
+        match file
+            .write_all(to_grafana_dashboard_json(&config).as_bytes())
+            .await
+        {
             Ok(_) => (),
             Err(err) => {
                 error!("Failed to write grafana dashboard file: {}", err);
@@ -317,11 +324,12 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
     let config_file_name = config_file_path
         .file_name()
         .expect("failed to get filename of config");
-    let mut abs_config_path = std::fs::canonicalize(
+    let mut abs_config_path = tokio::fs::canonicalize(
         config_file_path
             .parent()
             .expect("could not get parent path of config file"),
     )
+    .await
     .expect("could not create absolute path from config_path");
     abs_config_path.push(config_file_name);
 
@@ -378,10 +386,10 @@ fn is_config_file(path: &PathBuf, config_path: &PathBuf) -> bool {
     path.eq(config_path)
 }
 
-fn read_to_string(file: &str) -> Result<String, std::io::Error> {
+async fn read_to_string(file: &str) -> Result<String, tokio::io::Error> {
     let path = Path::new(file);
-    let mut f = File::open(path)?;
+    let mut f = File::open(path).await?;
     let mut c = String::new();
-    f.read_to_string(&mut c)?;
+    f.read_to_string(&mut c).await?;
     Ok(c)
 }

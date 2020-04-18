@@ -2,9 +2,9 @@ use crate::messages::{Entry, EntryDTO, Failure, FailureDTO};
 use crate::{config::ReportOn, utils::file::Append};
 use log::*;
 
-use std::fs::File;
-use std::io::prelude::*;
 use std::path::Path;
+use tokio::fs::File;
+use tokio::prelude::*;
 use tokio::sync::broadcast;
 
 pub struct FileReporterTask {
@@ -13,21 +13,29 @@ pub struct FileReporterTask {
 }
 
 impl FileReporterTask {
-    pub fn new(
+    pub async fn new(
         location: String,
         receiver: broadcast::Receiver<Result<EntryDTO, FailureDTO>>,
-    ) -> Result<FileReporterTask, std::io::Error> {
+    ) -> Result<FileReporterTask, tokio::io::Error> {
         let file_path = Path::new(&location);
         let path = file_path
             .parent()
             .expect("failed to parent folder of log file");
 
-        match std::fs::create_dir(path) {
+        match tokio::fs::create_dir_all(path).await {
             Ok(_) => (),
-            Err(ref e) if e.kind() == std::io::ErrorKind::AlreadyExists => (),
+            Err(ref e) if e.kind() == tokio::io::ErrorKind::AlreadyExists => (),
             Err(e) => panic!(e),
         }
-        let file = File::create_append(file_path).expect("failed to create or open in write mode");
+
+        match tokio::fs::create_dir(path).await {
+            Ok(_) => (),
+            Err(ref e) if e.kind() == tokio::io::ErrorKind::AlreadyExists => (),
+            Err(e) => panic!(e),
+        }
+        let file = File::create_append(file_path)
+            .await
+            .expect("failed to create or open in write mode");
 
         Ok(FileReporterTask {
             file: file,
@@ -52,7 +60,7 @@ impl FileReporterTask {
                                     entry.response_code,
                                     entry.target.url
                                 );
-                                match self.file.write(line.as_bytes()) {
+                                match self.file.write(line.as_bytes()).await {
                                     Ok(_) => (),
                                     Err(err) => {
                                         error!("failed to write to log file: {}", err.to_string());
@@ -76,7 +84,7 @@ impl FileReporterTask {
                                     entry.latency,
                                     entry.reason.trim()
                                 );
-                                match self.file.write((line).as_bytes()) {
+                                match self.file.write((line).as_bytes()).await {
                                     Ok(_) => (),
                                     Err(err) => {
                                         error!("failed to write to log file: {}", err.to_string());

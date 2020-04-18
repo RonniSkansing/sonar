@@ -5,20 +5,23 @@ pub mod factory {
 }
 
 pub mod file {
-    use std::fs::File;
-    use std::fs::OpenOptions;
+    use async_trait::async_trait;
     use std::path::Path;
+    use tokio::fs::File;
+    use tokio::fs::OpenOptions;
 
+    #[async_trait(?Send)]
     pub trait Append {
-        fn create_append<P: AsRef<Path>>(path: P) -> std::io::Result<File> {
+        async fn create_append<P: AsRef<Path>>(path: P) -> tokio::io::Result<File> {
             OpenOptions::new()
                 .truncate(false)
                 .append(true)
                 .create(true)
                 .open(path.as_ref())
+                .await
         }
     }
-    impl Append for std::fs::File {}
+    impl Append for tokio::fs::File {}
 }
 
 pub mod prometheus {
