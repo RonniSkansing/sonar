@@ -23,5 +23,7 @@
 - Improve error messages
 - Refactor
 - Add tests
+- Implement metrics for total outgoing requests per second and averaege request time
 - Add a 'spread' strategy for dispatching each target at different times, to minimize the overlap of two different targets requesting at the same time
 - Implement using prometheus process metrics, note it wont work with for_self as multiple threads are started and all the threads id's must be collected and used
+- Better grafana auto dashboard

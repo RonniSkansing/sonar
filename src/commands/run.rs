@@ -3,6 +3,7 @@ use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporterTask;
 use crate::utils::prometheus as util_prometheus;
 use crate::{requesters::http::HttpRequestTask, server::SonarServer};
+use broadcast::RecvError;
 use futures::future::{AbortHandle, Abortable};
 use log::*;
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
@@ -12,11 +13,13 @@ use std::error::Error;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    time::Duration,
 };
 use tokio::fs::File;
 use tokio::{
     prelude::*,
     sync::{broadcast, broadcast::channel, oneshot},
+    time::delay_for,
 };
 
 pub struct Executor {
@@ -216,6 +219,7 @@ impl Executor {
             let counters = counters.clone();
             tokio::spawn(async move {
                 loop {
+                    debug!("Started prometheus metrics receiver");
                     match r.recv().await {
                         Ok(m) => match m {
                             Ok(r) => {
@@ -240,9 +244,21 @@ impl Executor {
                             }
                         },
                         Err(err) => {
-                            debug!("failed to read message: {}", err);
+                            match err {
+                                RecvError::Closed => {
+                                    debug!("Stopped prometheus metrics receiver: {}", err);
+                                    break;
+                                }
+                                RecvError::Lagged(n) => {
+                                    warn!(
+                                        "Prometheus metrics receiver is lagging behind with: {}",
+                                        n
+                                    );
+                                }
+                            };
                         }
                     }
+                    delay_for(Duration::from_millis(500)).await;
                 }
             });
         }
