@@ -6,10 +6,38 @@ pub mod factory {
 
 pub mod file {
     use async_trait::async_trait;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use tokio::fs::File;
     use tokio::fs::OpenOptions;
     use tokio::prelude::*;
+
+    // Returns a tuple of the absolute path to the file and absolute path of the parent folder
+    pub async fn to_absolute_pair<'a>(file_path: PathBuf) -> (PathBuf, PathBuf) {
+        let config_file_name = file_path
+            .file_name()
+            .expect("failed to get filename to into absolute path");
+        let mut abs_file_path = tokio::fs::canonicalize(
+            file_path
+                .parent()
+                .expect("failed to get parent path of file"),
+        )
+        .await
+        .expect("failed to create absolute path from file path");
+        abs_file_path.push(config_file_name);
+
+        return if abs_file_path.is_dir() {
+            (abs_file_path.clone(), abs_file_path)
+        } else {
+            (
+                abs_file_path.clone(),
+                PathBuf::from(
+                    abs_file_path
+                        .parent()
+                        .expect("failed to unwrap parent path from absolute file path"),
+                ),
+            )
+        };
+    }
 
     pub async fn read_to_string(file: &str) -> Result<String, tokio::io::Error> {
         let path = Path::new(file);

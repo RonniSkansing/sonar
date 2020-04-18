@@ -1,7 +1,10 @@
 use crate::config::{grafana::to_grafana_dashboard_json, Config, Target, TargetDefault};
 use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporterTask;
-use crate::utils::{file::read_to_string, prometheus as util_prometheus};
+use crate::utils::{
+    file::{read_to_string, to_absolute_pair},
+    prometheus as util_prometheus,
+};
 use crate::{requesters::http::HttpRequestTask, server::SonarServer};
 use broadcast::RecvError;
 use futures::future::{AbortHandle, Abortable};
@@ -333,55 +336,38 @@ impl Executor {
 }
 
 pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<(), Box<dyn Error>> {
-    let config_file_name = config_file_path
-        .file_name()
-        .expect("failed to get filename of config");
-    let mut abs_config_path = tokio::fs::canonicalize(
-        config_file_path
-            .parent()
-            .expect("could not get parent path of config file"),
-    )
-    .await
-    .expect("could not create absolute path from config_path");
-    abs_config_path.push(config_file_name);
-
-    let watch_root = if abs_config_path.is_dir() {
-        abs_config_path.as_path()
-    } else {
-        abs_config_path
-            .parent()
-            .expect("could not unwrap parent path to config_path")
-    };
+    let (abs_path_to_config_file, abs_path_to_config_folder) =
+        to_absolute_pair(config_file_path.clone()).await;
     debug!(
-        "Watching for changes in {}",
-        watch_root
+        "Watching for config changes in {}",
+        abs_path_to_config_folder
             .to_str()
-            .expect("could not unwrap watch_root to str")
+            .expect("failed to stringify abs config folder path")
     );
 
     let (tx, rx) = std::sync::mpsc::channel::<DebouncedEvent>();
-    let mut config_watcher =
-        watcher(tx, std::time::Duration::from_secs(1)).expect("failed to create config watcher");
+    let mut config_watcher = watcher(tx, std::time::Duration::from_millis(100))
+        .expect("failed to create config watcher");
 
     config_watcher
-        .watch(watch_root, RecursiveMode::NonRecursive)
+        .watch(abs_path_to_config_folder, RecursiveMode::NonRecursive)
         .expect("failed to watch config root folder");
 
     // handle initial start run
     let mut executor = Executor::new(client);
-    executor.handle(abs_config_path.clone()).await;
+    executor.handle(abs_path_to_config_file.clone()).await;
     // handle when changes are made to the config file
     loop {
         match rx.recv() {
             Ok(event) => match event {
                 DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
-                    if !path.eq(&abs_config_path) {
+                    if !path.eq(&abs_path_to_config_file) {
                         continue;
                     }
-                    executor.handle(abs_config_path.clone()).await;
+                    executor.handle(abs_path_to_config_file.clone()).await;
                 }
                 DebouncedEvent::Remove(path) => {
-                    if !path.eq(&abs_config_path) {
+                    if !path.eq(&abs_path_to_config_file) {
                         executor.stop_all().await;
                         continue;
                     }
