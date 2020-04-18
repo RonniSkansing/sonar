@@ -16,13 +16,20 @@ pub enum ReportOn {
 pub struct LogFile {
     pub file: String,
 
-    #[serde(default = "factory::none", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default = "LogFile::some_default_report_on",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub report_on: Option<ReportOn>,
 }
 
 impl LogFile {
     pub fn clone_unwrap_report_on(&self) -> ReportOn {
         self.report_on.clone().expect("failed to get report_on")
+    }
+
+    pub fn some_default_report_on() -> Option<ReportOn> {
+        Some(ReportOn::Both)
     }
 }
 
@@ -51,6 +58,8 @@ pub struct Target {
     pub max_concurrent: Option<u32>,
     #[serde(default = "factory::none", skip_serializing_if = "Option::is_none")]
     pub log: Option<LogFile>,
+    #[serde(default = "factory::none", skip_serializing_if = "Option::is_none")]
+    pub prometheus_response_time_bucket: Option<Vec<f64>>,
 }
 
 impl Target {
@@ -92,6 +101,7 @@ impl Target {
             name: Some(name),
             timeout: self.timeout,
             max_concurrent: self.max_concurrent,
+            prometheus_response_time_bucket: self.prometheus_response_time_bucket,
             log: self.log,
         }
     }
@@ -134,10 +144,29 @@ pub struct GrafanaConfig {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TargetDefault {
+    pub prometheus_response_time_bucket: Vec<f64>,
+}
+
+impl TargetDefault {
+    pub fn default() -> Self {
+        Self {
+            prometheus_response_time_bucket: Self::default_prometheus_response_time_bucket(),
+        }
+    }
+
+    pub fn default_prometheus_response_time_bucket() -> Vec<f64> {
+        vec![50.0, 100.0, 150.0, 200.0, 250.0, 300.0, 350.0, 400.0, 500.0]
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub server: Option<ServerConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grafana: Option<GrafanaConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub targets_defaults: Option<TargetDefault>,
     pub targets: Vec<Target>,
 }

@@ -1,4 +1,4 @@
-use crate::config::{grafana::to_grafana_dashboard_json, Config, Target};
+use crate::config::{grafana::to_grafana_dashboard_json, Config, Target, TargetDefault};
 use crate::messages::{EntryDTO, FailureDTO};
 use crate::reporters::file::FileReporterTask;
 use crate::utils::prometheus as util_prometheus;
@@ -66,6 +66,7 @@ impl Executor {
                             if server_config.prometheus_endpoint.is_some() {
                                 self.handle_prometheus_exporter(
                                     config.targets.clone(),
+                                    config.targets_defaults.clone(),
                                     request_data_receivers,
                                 );
                             }
@@ -78,8 +79,13 @@ impl Executor {
         }
     }
 
-    async fn stop_all(&mut self, abort_controllers: Vec<AbortHandle>) {
+    async fn stop(&mut self, abort_controllers: Vec<AbortHandle>) {
         abort_controllers.iter().for_each(|a| a.abort());
+    }
+
+    async fn stop_all(&mut self) {
+        self.stop_requesters().await;
+        self.stop_reporters().await;
     }
 
     async fn stop_reporters(&mut self) {
@@ -88,7 +94,7 @@ impl Executor {
                 .requester_abort_controllers
                 .take()
                 .expect("failed to take requester forceful shutdown handlers");
-            self.stop_all(controllers).await;
+            self.stop(controllers).await;
         }
     }
 
@@ -98,7 +104,7 @@ impl Executor {
                 .requester_abort_controllers
                 .take()
                 .expect("failed to take requester forceful shutdown handlers");
-            self.stop_all(controllers).await;
+            self.stop(controllers).await;
         }
     }
 
@@ -114,7 +120,6 @@ impl Executor {
         let mut reporter_abort_handles = Vec::new();
         let mut request_result_rx = Vec::new();
         for target in targets {
-            // TODO set the capacity to be number of concurrent requests?
             let (broadcast_tx, _broadcast_rx) = channel::<Result<EntryDTO, FailureDTO>>(1);
             request_result_rx.push(_broadcast_rx);
 
@@ -153,6 +158,7 @@ impl Executor {
     fn handle_prometheus_exporter(
         &mut self,
         targets: Vec<Target>,
+        target_defaults: Option<TargetDefault>,
         receivers: Vec<broadcast::Receiver<Result<EntryDTO, FailureDTO>>>,
     ) {
         let mut timers: HashMap<String, Histogram> = HashMap::new();
@@ -170,13 +176,22 @@ impl Executor {
             counters.insert(counter_success_name.clone(), counter_success.clone());
 
             let timer_name = util_prometheus::timer_name(target.clone_unwrap_name());
+            let prometheus_response_time_bucket =
+                if target.prometheus_response_time_bucket.is_none() {
+                    if target_defaults.is_none() {
+                        TargetDefault::default_prometheus_response_time_bucket()
+                    } else {
+                        target_defaults
+                            .clone()
+                            .unwrap()
+                            .prometheus_response_time_bucket
+                    }
+                } else {
+                    target.prometheus_response_time_bucket.clone().unwrap()
+                };
             let request_time_opts =
                 HistogramOpts::new(timer_name.clone(), String::from("latency in ms"))
-                    // TODO replace with bucket in target
-                    .buckets(vec![
-                        1.0, 10.0, 50.0, 100.0, 200.0, 400.0, 600.0, 800.0, 1000.0, 1200.0, 1400.0,
-                        1600.0, 1800.0, 2000.0,
-                    ]);
+                    .buckets(prometheus_response_time_bucket);
             let request_time =
                 Histogram::with_opts(request_time_opts).expect("unable to create timer");
 
@@ -346,8 +361,8 @@ pub async fn execute<'a>(config_file_path: PathBuf, client: Client) -> Result<()
                     executor.handle(abs_config_path.clone()).await;
                 }
                 DebouncedEvent::Remove(path) => {
-                    // TODO
                     if !is_config_file(&path, &abs_config_path) {
+                        executor.stop_all().await;
                         continue;
                     }
                     println!("Not implemtented: handle deleted config");

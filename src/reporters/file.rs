@@ -59,6 +59,7 @@ impl FileReporterTask {
                                     }
                                 }
                             }
+                            // TODO what is happning here?
                             ReportOn::Failure => (),
                         }
                     }

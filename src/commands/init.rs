@@ -1,4 +1,6 @@
-use crate::config::{Config, GrafanaConfig, LogFile, ReportOn, ServerConfig, Target};
+use crate::config::{
+    Config, GrafanaConfig, LogFile, ReportOn, ServerConfig, Target, TargetDefault,
+};
 use duration_string::DurationString;
 use log::*;
 use std::fs::File;
@@ -11,6 +13,7 @@ pub fn minimal_config() {
     let config = serde_yaml::to_string(&Config {
         server: None,
         grafana: None,
+        targets_defaults: None,
         targets: vec![Target {
             name: None,
             url: String::from("http://example.com"),
@@ -18,6 +21,7 @@ pub fn minimal_config() {
             max_concurrent: None,
             timeout: None,
             log: None,
+            prometheus_response_time_bucket: None,
         }
         .hydrate()],
     })
@@ -48,6 +52,7 @@ pub fn maximal_config() {
     let config = serde_yaml::to_string(&Config {
         server: Some(server),
         grafana: Some(grafana),
+        targets_defaults: Some(TargetDefault::default()),
         targets: vec![Target {
             name: Some(Target::normalize_name(&url)),
             url,
@@ -55,6 +60,7 @@ pub fn maximal_config() {
             timeout: Some(timeout),
             max_concurrent: Some(2),
             log: Some(log),
+            prometheus_response_time_bucket: Some(vec![100.0, 250.0, 500.0, 1000.0]),
         }],
     })
     .expect("unexpected invalid yaml");
