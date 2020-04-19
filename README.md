@@ -16,9 +16,11 @@
 * TODO
 
 - TODO's
-- init from file with a domain per line
+- Implement a force arg for init to overwrite the current file and fail init on existing file
 - Implement webhooks for success / failure
 - Implement rest endpoint for reading log
+- Implement a single target mode
+- Implement a cluster master / slave node mode
 - Improve error messages
 - Refactor
 - Add tests

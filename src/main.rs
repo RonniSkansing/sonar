@@ -108,11 +108,18 @@ fn main() {
         help: "Inits a new project in the current directory",
     };
 
-    let init_command_full_arg = SonarArg {
-        name: "full",
-        short: "f",
+    let init_command_complete_arg = SonarArg {
+        name: "c",
+        short: "c",
         takes_value: &false,
         help: "Output a config with all available settings",
+    };
+
+    let init_command_from_arg = SonarArg {
+        name: "file",
+        short: "f",
+        takes_value: &true,
+        help: "Creates a config from a file with a url for each line",
     };
 
     let run_command = SonarCommand {
@@ -130,7 +137,8 @@ fn main() {
         .subcommand(
             init_command
                 .into_clap()
-                .arg(init_command_full_arg.into_clap()),
+                .arg(init_command_complete_arg.into_clap())
+                .arg(init_command_from_arg.into_clap()),
         )
         .subcommand(
             run_command
@@ -179,17 +187,35 @@ fn main() {
         }
     }
 
-    let _ = CombinedLogger::init(loggers).expect("Failed to setup logger");
+    let _ = CombinedLogger::init(loggers).expect("failed to setup logger");
 
     // run command
     match matches.subcommand() {
         (name, Some(matches)) if name == init_command.name => {
             let mut rt =
                 tokio::runtime::Runtime::new().expect("failed to start default tokio runtime");
-            if !matches.args.get(init_command_full_arg.name).is_some() {
-                rt.block_on(commands::init::minimal_config());
-            } else {
-                rt.block_on(commands::init::maximal_config());
+            let complete_arg = matches.args.get(init_command_complete_arg.name);
+            match matches.args.get(init_command_from_arg.name) {
+                Some(args) => {
+                    let domain_file_path = PathBuf::from(
+                        args.vals[0]
+                            .clone()
+                            .into_string()
+                            .expect("failed to get path to file with domain names"),
+                    );
+                    match complete_arg {
+                        Some(_) => rt.block_on(commands::init::from_file_with_complete_config(
+                            domain_file_path,
+                        )),
+                        None => rt.block_on(commands::init::from_file_with_minimal_config(
+                            domain_file_path,
+                        )),
+                    }
+                }
+                None => match complete_arg {
+                    Some(_) => rt.block_on(commands::init::maximal_config()),
+                    None => rt.block_on(commands::init::minimal_config()),
+                },
             }
         }
         (name, Some(matches)) if name == run_command.name => {
