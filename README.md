@@ -15,7 +15,9 @@
 
 * TODO
 
+- Memory leak =(
 - TODO's
+- Write a Features part of readme
 - Implement a force arg for init to overwrite the current file and fail init on existing file
 - Implement webhooks for success / failure
 - Implement rest endpoint for reading log

@@ -7,6 +7,14 @@ use std::path::{Path, PathBuf};
 use tokio::prelude::*;
 
 const DEFAULT_CONFIG_PATH: &str = "./sonar.yaml";
+const DEFAULT_SERVER_IP: &str = "0.0.0.0";
+const DEFAULT_SERVER_PORT: u16 = 8080;
+const DEFAULT_SERVER_HEALTH_ENDPOINT: &str = "/health";
+const DEFAULT_SERVER_PROMETHEUS_ENDPOINT: &str = "/metrics";
+const DEFAULT_MAX_CONCURRENT: u32 = 1;
+const DEFAULT_GRAFANA_JSON_PATH: &str = "/opt/sonar/dashboards/sonar.json";
+const DEFAULT_INTERVAL: &str = "1m";
+const DEFAULT_TIMEOUT: &str = "5s";
 
 pub async fn minimal_config() {
     let config = serde_yaml::to_string(&Config {
@@ -31,17 +39,18 @@ pub async fn minimal_config() {
 
 pub async fn maximal_config() {
     let server = ServerConfig {
-        ip: String::from("0.0.0.0"),
-        port: 8080,
-        health_endpoint: Some(String::from("/health")),
-        prometheus_endpoint: Some(String::from("/metrics")),
+        ip: String::from(DEFAULT_SERVER_IP),
+        port: DEFAULT_SERVER_PORT,
+        health_endpoint: Some(String::from(DEFAULT_SERVER_HEALTH_ENDPOINT)),
+        prometheus_endpoint: Some(String::from(DEFAULT_SERVER_PROMETHEUS_ENDPOINT)),
     };
     let grafana = GrafanaConfig {
-        dashboard_json_output_path: "/opt/sonar/dashboards/sonar.json".to_string(),
+        dashboard_json_output_path: DEFAULT_GRAFANA_JSON_PATH.to_string(),
     };
-    let interval =
-        DurationString::from_string("10s".to_string()).expect("failed to create interval");
-    let timeout = DurationString::from_string("5s".to_string()).expect("failed to create timeout");
+    let interval = DurationString::from_string(DEFAULT_INTERVAL.to_string())
+        .expect("failed to create interval");
+    let timeout =
+        DurationString::from_string(DEFAULT_TIMEOUT.to_string()).expect("failed to create timeout");
     let log = LogFile {
         file: "./log/https-example-com.log".to_string(),
         report_on: Some(ReportOn::Success),
@@ -57,7 +66,7 @@ pub async fn maximal_config() {
             url,
             interval: Some(interval),
             timeout: Some(timeout),
-            max_concurrent: Some(2),
+            max_concurrent: Some(DEFAULT_MAX_CONCURRENT),
             log: Some(log),
             prometheus_response_time_bucket: Some(vec![100.0, 250.0, 500.0, 1000.0]),
         }],
@@ -105,13 +114,13 @@ pub async fn from_file_with_minimal_config(file_path: PathBuf) {
 
 pub async fn from_file_with_complete_config(file_path: PathBuf) {
     let server = ServerConfig {
-        ip: String::from("0.0.0.0"),
-        port: 8080,
-        health_endpoint: Some(String::from("/health")),
-        prometheus_endpoint: Some(String::from("/metrics")),
+        ip: String::from(DEFAULT_SERVER_IP),
+        port: DEFAULT_SERVER_PORT,
+        health_endpoint: Some(String::from(DEFAULT_SERVER_HEALTH_ENDPOINT)),
+        prometheus_endpoint: Some(String::from(DEFAULT_SERVER_PROMETHEUS_ENDPOINT)),
     };
     let grafana = GrafanaConfig {
-        dashboard_json_output_path: "/opt/sonar/dashboards/sonar.json".to_string(),
+        dashboard_json_output_path: DEFAULT_GRAFANA_JSON_PATH.to_string(),
     };
     match tokio::fs::read_to_string(file_path).await {
         Ok(file) => {
@@ -122,9 +131,9 @@ pub async fn from_file_with_complete_config(file_path: PathBuf) {
                 }
                 let url = line.to_string();
                 let name = Target::normalize_name(&url);
-                let interval = DurationString::from_string("10s".to_string())
+                let interval = DurationString::from_string(DEFAULT_INTERVAL.to_string())
                     .expect("failed to create interval");
-                let timeout = DurationString::from_string("5s".to_string())
+                let timeout = DurationString::from_string(DEFAULT_TIMEOUT.to_string())
                     .expect("failed to create timeout");
                 let log = LogFile {
                     file: format!("./log/{}.log", name),

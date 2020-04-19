@@ -5,6 +5,10 @@ use strum_macros::Display;
 
 pub mod grafana;
 
+const DEFAULT_MAX_CONCURRENT: u32 = 1;
+const DEFAULT_INTERVAL: &str = "1m";
+const DEFAULT_TIMEOUT: &str = "5s";
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
 pub enum ReportOn {
     Success,
@@ -64,20 +68,20 @@ pub struct Target {
 impl Target {
     fn some_default_timeout() -> Option<DurationString> {
         Some(
-            DurationString::from_string(String::from("5s"))
+            DurationString::from_string(String::from(DEFAULT_TIMEOUT))
                 .expect("failed to create from duration string"),
         )
     }
 
     fn some_default_interval() -> Option<DurationString> {
         Some(
-            DurationString::from_string(String::from("1m"))
+            DurationString::from_string(String::from(DEFAULT_INTERVAL))
                 .expect("failed to create from duration string"),
         )
     }
 
     fn some_default_max_concurrent() -> Option<u32> {
-        Some(1)
+        Some(DEFAULT_MAX_CONCURRENT)
     }
 
     pub fn normalize_name(name: &String) -> String {
