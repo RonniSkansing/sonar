@@ -25,7 +25,7 @@ use log::*;
 use reqwest::Client;
 use simplelog::*;
 use std::path::PathBuf;
-use tokio::runtime;
+use tokio::runtime::{self, Runtime};
 
 const APP_NAME: &str = "sonar";
 
@@ -126,6 +126,14 @@ fn main() {
         help: "Creates a config from a file with a url for each line",
     };
 
+    let init_command_overwrite_from_arg = SonarArg {
+        name: "overwrite",
+        short: "o",
+        long: "overwrite",
+        takes_value: &true,
+        help: "Overwrites any existing config file",
+    };
+
     let run_command = SonarCommand {
         name: "run",
         about: "runs the project",
@@ -141,7 +149,8 @@ fn main() {
             init_command
                 .into_clap()
                 .arg(init_command_complete_arg.into_clap())
-                .arg(init_command_from_arg.into_clap()),
+                .arg(init_command_from_arg.into_clap())
+                .arg(init_command_overwrite_from_arg.into_clap()),
         )
         .subcommand(
             run_command
@@ -195,31 +204,28 @@ fn main() {
     // run command
     match matches.subcommand() {
         (name, Some(matches)) if name == init_command.name => {
-            let mut rt =
-                tokio::runtime::Runtime::new().expect("failed to start default tokio runtime");
-            let complete_arg = matches.args.get(init_command_complete_arg.name);
-            match matches.args.get(init_command_from_arg.name) {
-                Some(args) => {
-                    let domain_file_path = PathBuf::from(
-                        args.vals[0]
-                            .clone()
-                            .into_string()
-                            .expect("failed to get path to file with domain names"),
-                    );
-                    match complete_arg {
-                        Some(_) => rt.block_on(commands::init::from_file_with_complete_config(
-                            domain_file_path,
-                        )),
-                        None => rt.block_on(commands::init::from_file_with_minimal_config(
-                            domain_file_path,
-                        )),
-                    }
-                }
-                None => match complete_arg {
-                    Some(_) => rt.block_on(commands::init::maximal_config()),
-                    None => rt.block_on(commands::init::minimal_config()),
+            let mut rt = Runtime::new().expect("failed to start default tokio runtime");
+            let file_path = match matches.args.get(init_command_from_arg.name) {
+                Some(args) => Some(PathBuf::from(
+                    args.vals[0]
+                        .clone()
+                        .into_string()
+                        .expect("failed to get path to file with domain names"),
+                )),
+                None => None,
+            };
+            let size = match matches.args.get(init_command_complete_arg.name) {
+                Some(_) => commands::init::Size::Maximal,
+                None => commands::init::Size::Minimal,
+            };
+            let command = commands::init::InitCommand {
+                config: commands::init::Config {
+                    force: false,
+                    size,
+                    from_file: file_path,
                 },
-            }
+            };
+            rt.block_on(command.create());
         }
         (name, Some(matches)) if name == run_command.name => {
             // setup runtime
