@@ -263,7 +263,6 @@ impl Executor {
         }
         self.prometheus_registry = Some(registry);
 
-        // TODO optimize this, make a map of receivers and what target they are connected to.
         for mut r in receivers {
             let timers = timers.clone();
             let counters = counters.clone();

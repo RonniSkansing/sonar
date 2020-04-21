@@ -39,20 +39,18 @@ struct Application<'a> {
 struct SonarCommand<'a> {
     name: &'a str,
     about: &'a str,
-    help: &'a str,
 }
 
 impl SonarCommand<'_> {
     fn into_clap(&self) -> App {
-        SubCommand::with_name(self.name)
-            .help(self.help)
-            .about(self.about)
+        SubCommand::with_name(self.name).about(self.about)
     }
 }
 
 struct SonarArg<'a> {
     name: &'a str,
     short: &'a str,
+    long: &'a str,
     takes_value: &'a bool,
     help: &'a str,
 }
@@ -62,6 +60,7 @@ impl SonarArg<'_> {
         Arg::with_name(self.name)
             .help(self.help)
             .short(self.short)
+            .long(self.long)
             .takes_value(*self.takes_value)
     }
 }
@@ -77,6 +76,7 @@ fn main() {
     let debug_arg = SonarArg {
         name: "debug",
         short: "d",
+        long: "debug",
         takes_value: &false,
         help: "Add a backtrace (if build with symbols)",
     };
@@ -84,6 +84,7 @@ fn main() {
     let run_command_threads_arg = SonarArg {
         name: "threads",
         short: "t",
+        long: "threads",
         takes_value: &true,
         help: "Max number of threads. The default value is the number of cores available to the system.",
     };
@@ -91,6 +92,7 @@ fn main() {
     let run_command_config_arg = SonarArg {
         name: "config",
         short: "c",
+        long: "config",
         takes_value: &true,
         help: "Config file. Example -> sonar run -c ./foo/bar/baz.yaml",
     };
@@ -98,6 +100,7 @@ fn main() {
     let quiet_arg = SonarArg {
         name: "quiet",
         short: "q",
+        long: "quiet",
         takes_value: &false,
         help: "Quiet",
     };
@@ -105,12 +108,12 @@ fn main() {
     let init_command = SonarCommand {
         name: "init",
         about: "Inits a new project in the current directory",
-        help: "Inits a new project in the current directory",
     };
 
     let init_command_complete_arg = SonarArg {
-        name: "c",
+        name: "complete",
         short: "c",
+        long: "complete",
         takes_value: &false,
         help: "Output a config with all available settings",
     };
@@ -118,6 +121,7 @@ fn main() {
     let init_command_from_arg = SonarArg {
         name: "file",
         short: "f",
+        long: "file",
         takes_value: &true,
         help: "Creates a config from a file with a url for each line",
     };
@@ -125,7 +129,6 @@ fn main() {
     let run_command = SonarCommand {
         name: "run",
         about: "runs the project",
-        help: "runs the project",
     };
 
     let app = App::new(sonar.name)
