@@ -9,6 +9,12 @@ const DEFAULT_MAX_CONCURRENT: u32 = 1;
 const DEFAULT_INTERVAL: &str = "1m";
 const DEFAULT_TIMEOUT: &str = "5s";
 
+const DEFAULT_SERVER_IP: &str = "0.0.0.0";
+const DEFAULT_SERVER_PORT: u16 = 8080;
+const DEFAULT_SERVER_HEALTH_ENDPOINT: &str = "/health";
+const DEFAULT_SERVER_PROMETHEUS_ENDPOINT: &str = "/metrics";
+const DEFAULT_GRAFANA_JSON_PATH: &str = "/opt/sonar/dashboards/sonar.json";
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Display)]
 pub enum ReportOn {
     Success,
@@ -140,10 +146,39 @@ pub struct ServerConfig {
     pub prometheus_endpoint: Option<String>,
 }
 
+impl<'a> ServerConfig {
+    pub fn new<T: Into<String>, P: Into<u16>>(ip: T, port: P) -> Self {
+        ServerConfig {
+            ip: ip.into(),
+            port: port.into(),
+            health_endpoint: None,
+            prometheus_endpoint: None,
+        }
+    }
+
+    pub fn health_endpoint<T: Into<String>>(&'a mut self, path: T) -> &'a mut Self {
+        self.health_endpoint = Some(path.into());
+        self
+    }
+
+    pub fn prometheus_endpoint<T: Into<String>>(&'a mut self, path: T) -> &'a mut Self {
+        self.prometheus_endpoint = Some(path.into());
+        self
+    }
+}
+
 //
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GrafanaConfig {
     pub dashboard_json_output_path: String,
+}
+
+impl GrafanaConfig {
+    pub fn new<T: Into<String>>(output_file_path: T) -> Self {
+        Self {
+            dashboard_json_output_path: output_file_path.into(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -172,4 +207,127 @@ pub struct Config {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub targets_defaults: Option<TargetDefault>,
     pub targets: Vec<Target>,
+}
+
+impl Config {
+    pub fn create_with_minimal_fields() -> Self {
+        Self {
+            server: None,
+            grafana: None,
+            targets_defaults: None,
+            targets: vec![Target {
+                name: None,
+                url: String::from("http://example.com"),
+                interval: None,
+                max_concurrent: None,
+                timeout: None,
+                log: None,
+                prometheus_response_time_bucket: None,
+            }
+            .hydrate()],
+        }
+    }
+
+    pub fn create_with_maximum_fields() -> Self {
+        let server = ServerConfig::new(DEFAULT_SERVER_IP, DEFAULT_SERVER_PORT)
+            .health_endpoint(DEFAULT_SERVER_HEALTH_ENDPOINT)
+            .prometheus_endpoint(DEFAULT_SERVER_PROMETHEUS_ENDPOINT)
+            .to_owned();
+        let grafana = GrafanaConfig::new(DEFAULT_GRAFANA_JSON_PATH);
+        let interval = DurationString::from_string(DEFAULT_INTERVAL.to_string())
+            .expect("failed to create interval");
+        let timeout = DurationString::from_string(DEFAULT_TIMEOUT.to_string())
+            .expect("failed to create timeout");
+        let log = LogFile {
+            file: "./log/https-example-com.log".to_string(),
+            report_on: Some(ReportOn::Success),
+        };
+        let url = "https://example.com".to_string();
+
+        Self {
+            server: Some(server),
+            grafana: Some(grafana),
+            targets_defaults: Some(TargetDefault::default()),
+            targets: vec![Target {
+                name: Some(Target::normalize_name(&url)),
+                url,
+                interval: Some(interval),
+                timeout: Some(timeout),
+                max_concurrent: Some(DEFAULT_MAX_CONCURRENT),
+                log: Some(log),
+                prometheus_response_time_bucket: Some(vec![100.0, 250.0, 500.0, 1000.0]),
+            }],
+        }
+    }
+
+    // takes a string of newline seperated domains to create a minimal config from
+    pub fn create_with_minimal_fields_with_urls(urls: String) -> Self {
+        let targets = urls
+            .split('\n')
+            .into_iter()
+            .filter(|l| l == &"")
+            .map(|l| {
+                Target {
+                    name: None,
+                    url: l.to_string(),
+                    interval: None,
+                    max_concurrent: None,
+                    timeout: None,
+                    log: None,
+                    prometheus_response_time_bucket: None,
+                }
+                .hydrate()
+            })
+            .collect();
+
+        Self {
+            server: None,
+            grafana: None,
+            targets_defaults: None,
+            targets,
+        }
+    }
+
+    // takes a string of newline seperated domains to create a minimal config from
+    pub fn create_with_maximum_fields_with_urls(urls: String) -> Self {
+        let server = ServerConfig::new(DEFAULT_SERVER_IP, DEFAULT_SERVER_PORT)
+            .health_endpoint(DEFAULT_SERVER_HEALTH_ENDPOINT)
+            .prometheus_endpoint(DEFAULT_SERVER_PROMETHEUS_ENDPOINT)
+            .to_owned();
+        let grafana = GrafanaConfig::new(DEFAULT_GRAFANA_JSON_PATH);
+        let targets = urls
+            .split('\n')
+            .into_iter()
+            .filter(|l| l == &"")
+            .map(|l| {
+                let url = l.to_string();
+                let name = Target::normalize_name(&url);
+                let interval = DurationString::from_string(DEFAULT_INTERVAL.to_string())
+                    .expect("failed to create interval");
+                let timeout = DurationString::from_string(DEFAULT_TIMEOUT.to_string())
+                    .expect("failed to create timeout");
+                let log = LogFile {
+                    file: format!("./log/{}.log", name),
+                    report_on: Some(ReportOn::Success),
+                };
+
+                Target {
+                    name: Some(name),
+                    url,
+                    interval: Some(interval),
+                    max_concurrent: Some(1),
+                    timeout: Some(timeout),
+                    log: Some(log),
+                    prometheus_response_time_bucket: Some(vec![100.0, 250.0, 500.0, 1000.0]),
+                }
+                .hydrate()
+            })
+            .collect();
+        Self {
+            server: Some(server),
+            grafana: Some(grafana),
+            targets_defaults: Some(TargetDefault::default()),
+            targets,
+        }
+    }
 }

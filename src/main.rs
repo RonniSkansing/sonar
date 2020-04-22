@@ -225,7 +225,7 @@ fn main() {
                     from_file: file_path,
                 },
             };
-            rt.block_on(command.create());
+            rt.block_on(command.execute());
         }
         (name, Some(matches)) if name == run_command.name => {
             // setup runtime
