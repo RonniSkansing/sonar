@@ -15,9 +15,8 @@
 mod commands;
 mod config;
 mod messages;
-mod reporters;
-mod requesters;
 mod server;
+mod tasks;
 mod utils;
 
 use clap::{App, Arg, Shell, SubCommand};

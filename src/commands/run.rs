@@ -1,11 +1,11 @@
 use crate::config::{grafana::to_grafana_dashboard_json, Config, Target, TargetDefault};
 use crate::messages::{EntryDTO, FailureDTO};
-use crate::reporters::file::FileReporterTask;
+use crate::tasks::file::FileReporterTask;
 use crate::utils::{
     file::{read_to_string, to_absolute_pair},
     prometheus as util_prometheus,
 };
-use crate::{requesters::http::HttpRequestTask, server::SonarServer};
+use crate::{server::SonarServer, tasks::http::IntervalRequesterTask};
 use broadcast::RecvError;
 use futures::future::{AbortHandle, Abortable};
 use log::*;
@@ -197,7 +197,7 @@ impl Executor {
                 ));
             }
             // requesters
-            let requester = HttpRequestTask::new(self.http_client.clone(), broadcast_tx);
+            let requester = IntervalRequesterTask::new(self.http_client.clone(), broadcast_tx);
             let (abort_handle, abort_registration) = AbortHandle::new_pair();
             requester_abort_handles.push(abort_handle);
             tokio::spawn(Abortable::new(
