@@ -21,7 +21,7 @@ use tokio::{
     time::delay_for,
 };
 
-pub struct Executor {
+pub struct Command {
     http_client: Client,
     server_kill_sender: Option<oneshot::Sender<()>>,
     graceful_shutdown_complete_receiver: Option<oneshot::Receiver<()>>,
@@ -31,13 +31,10 @@ pub struct Executor {
     reporter_abort_controllers: Option<Vec<AbortHandle>>,
 }
 
-impl Executor {
-    pub async fn watch_config_and_handle<'a>(
-        config_file_path: PathBuf,
-        client: Client,
-    ) -> Result<(), Box<dyn Error>> {
+impl Command {
+    pub async fn exercute<'a>(config_path: PathBuf, client: Client) -> Result<(), Box<dyn Error>> {
         let (abs_path_to_config_file, abs_path_to_config_folder) =
-            to_absolute_pair(config_file_path.clone()).await;
+            to_absolute_pair(config_path.clone()).await;
 
         let (tx, rx) = std::sync::mpsc::channel::<DebouncedEvent>();
         let mut config_watcher = watcher(tx, std::time::Duration::from_millis(100))
@@ -51,7 +48,7 @@ impl Executor {
             .expect("failed to watch config root folder");
 
         // handle initial start run
-        let mut executor = Executor::new(client);
+        let mut executor = Command::new(client);
         executor.handle(abs_path_to_config_file.clone()).await;
         debug!(
             "watching for config changes in {}",

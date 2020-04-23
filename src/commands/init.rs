@@ -3,8 +3,6 @@ use log::*;
 use std::path::{Path, PathBuf};
 use tokio::{fs::read_to_string, prelude::*};
 
-const DEFAULT_CONFIG_PATH: &str = "./sonar.yaml";
-
 pub enum Size {
     Minimal,
     Maximal,
@@ -16,11 +14,11 @@ pub struct Config {
     pub from_file: Option<PathBuf>,
 }
 
-pub struct InitCommand {
+pub struct Command {
     pub config: Config,
 }
 
-impl InitCommand {
+impl Command {
     pub async fn execute(&self) {
         let config: Result<SonarConfig, std::io::Error> = if self.config.from_file.is_some() {
             let file_path = PathBuf::from(self.config.from_file.clone().unwrap());
@@ -53,7 +51,7 @@ impl InitCommand {
     }
 
     async fn config_exists(&self) -> bool {
-        if let Ok(_) = tokio::fs::File::open(DEFAULT_CONFIG_PATH).await {
+        if let Ok(_) = tokio::fs::File::open(crate::DEFAULT_CONFIG_PATH).await {
             true
         } else {
             false
@@ -61,7 +59,7 @@ impl InitCommand {
     }
 
     async fn write(&self, config: &[u8]) {
-        let path = Path::new(DEFAULT_CONFIG_PATH);
+        let path = Path::new(crate::DEFAULT_CONFIG_PATH);
         let display = path.display();
 
         let mut file = match tokio::fs::File::create(path).await {

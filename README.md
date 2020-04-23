@@ -15,12 +15,10 @@
 
 * TODO
 
-- Implement a force arg for init to overwrite the current file and fail init on existing file
 - Hook up an global abort handler on any panic
 - Implement webhooks for success / failure
 - Implement rest endpoint for reading log
 - Implement a single target mode
-
 - Implement a cluster master / slave node mode
 - Improve error messages / maybe change to a tracing lib
 - Refactor

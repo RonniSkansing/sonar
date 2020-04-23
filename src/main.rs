@@ -27,6 +27,7 @@ use std::path::PathBuf;
 use tokio::runtime::{self, Runtime};
 
 const APP_NAME: &str = "sonar";
+const DEFAULT_CONFIG_PATH: &str = "./sonar.yaml";
 
 struct Application<'a> {
     name: &'a str,
@@ -203,8 +204,7 @@ fn main() {
     // run command
     match matches.subcommand() {
         (name, Some(matches)) if name == init_command.name => {
-            let mut rt = Runtime::new().expect("failed to start default tokio runtime");
-            let file_path = match matches.args.get(init_command_from_arg.name) {
+            let from_file = match matches.args.get(init_command_from_arg.name) {
                 Some(args) => Some(PathBuf::from(
                     args.vals[0]
                         .clone()
@@ -217,14 +217,7 @@ fn main() {
                 Some(_) => commands::init::Size::Maximal,
                 None => commands::init::Size::Minimal,
             };
-            let command = commands::init::InitCommand {
-                config: commands::init::Config {
-                    force: false,
-                    size,
-                    from_file: file_path,
-                },
-            };
-            rt.block_on(command.execute());
+            dispatch_init_command(from_file, size);
         }
         (name, Some(matches)) if name == run_command.name => {
             // setup runtime
@@ -241,31 +234,17 @@ fn main() {
                 runtime_builder.max_threads(n);
                 debug!("Thread pool set to {}", n);
             }
-            let mut runtime = runtime_builder
-                .thread_name("sonar-pool")
-                .threaded_scheduler()
-                .enable_all()
-                .build()
-                .expect("Failed to build runtime");
 
-            let default_config_path_match = matches.args.get(run_command_config_arg.name);
-            let default_config_path = if default_config_path_match.is_some() {
-                let v = default_config_path_match.expect("failed to get default_config_path match");
-                v.vals[0]
-                    .clone()
-                    .into_string()
-                    .expect("failed to take cconfig_path osstring into string")
-            } else {
-                "./sonar.yaml".to_string()
+            let config_path = match matches.args.get(run_command_config_arg.name) {
+                Some(arg) => PathBuf::from(
+                    arg.vals[0]
+                        .clone()
+                        .into_string()
+                        .expect("failed to get config path"),
+                ),
+                None => DEFAULT_CONFIG_PATH.into(),
             };
-            debug!("config path: {}", default_config_path);
-
-            runtime
-                .block_on(commands::run::Executor::watch_config_and_handle(
-                    PathBuf::from(default_config_path.clone()),
-                    Client::new(),
-                ))
-                .expect("failed to block on run command");
+            dipatch_run_command(config_path, Client::new());
         }
         ("autocomplete", Some(sub_matches)) => {
             let shell: Shell = sub_matches
@@ -282,4 +261,31 @@ fn main() {
             println!("");
         }
     }
+}
+
+fn dispatch_init_command(from_file: Option<PathBuf>, size: commands::init::Size) {
+    let mut rt = Runtime::new().expect("failed to start default tokio runtime");
+    let command = commands::init::Command {
+        config: commands::init::Config {
+            force: false,
+            size,
+            from_file,
+        },
+    };
+    rt.block_on(command.execute());
+}
+
+fn dipatch_run_command(config_path: PathBuf, client: Client) {
+    // setup runtime
+    let mut runtime_builder = runtime::Builder::new();
+    let mut runtime = runtime_builder
+        .thread_name("sonar-pool")
+        .threaded_scheduler()
+        .enable_all()
+        .build()
+        .expect("Failed to build runtime");
+
+    runtime
+        .block_on(commands::run::Command::exercute(config_path, client))
+        .expect("failed to block on run command");
 }
