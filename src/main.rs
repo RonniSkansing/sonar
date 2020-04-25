@@ -11,8 +11,8 @@
 //!- Event: Requester completed/failed request
 //!  - Job: Logger writes to log file
 //!  - Job: Grafana metrics added to exporter client
-
-mod commands;
+mod cli;
+mod command;
 mod config;
 mod messages;
 mod server;
@@ -24,148 +24,82 @@ use log::*;
 use reqwest::Client;
 use simplelog::*;
 use std::path::PathBuf;
-use tokio::runtime::{self, Runtime};
+use tokio::runtime;
 
-const APP_NAME: &str = "sonar";
 const DEFAULT_CONFIG_PATH: &str = "./sonar.yaml";
 
-struct Application<'a> {
-    name: &'a str,
-    author: &'a str,
-    version: &'a str,
-    about: &'a str,
-}
-
-struct SonarCommand<'a> {
-    name: &'a str,
-    about: &'a str,
-}
-
-impl SonarCommand<'_> {
-    fn into_clap(&self) -> App {
-        SubCommand::with_name(self.name).about(self.about)
-    }
-}
-
-struct SonarArg<'a> {
-    name: &'a str,
-    short: &'a str,
-    long: &'a str,
-    takes_value: &'a bool,
-    help: &'a str,
-}
-
-impl SonarArg<'_> {
-    fn into_clap(&self) -> Arg {
-        Arg::with_name(self.name)
-            .help(self.help)
-            .short(self.short)
-            .long(self.long)
-            .takes_value(*self.takes_value)
-    }
-}
-
 fn main() {
-    let sonar = Application {
-        name: APP_NAME,
-        author: "",
-        version: "0.0.0",
-        about: "Portable monitoring",
-    };
-
-    let debug_arg = SonarArg {
-        name: "debug",
-        short: "d",
-        long: "debug",
-        takes_value: &false,
-        help: "Add a backtrace (if build with symbols)",
-    };
-
-    let run_command_threads_arg = SonarArg {
-        name: "threads",
-        short: "t",
-        long: "threads",
-        takes_value: &true,
-        help: "Max number of threads. The default value is the number of cores available to the system.",
-    };
-
-    let run_command_config_arg = SonarArg {
-        name: "config",
-        short: "c",
-        long: "config",
-        takes_value: &true,
-        help: "Config file. Example -> sonar run -c ./foo/bar/baz.yaml",
-    };
-
-    let quiet_arg = SonarArg {
-        name: "quiet",
-        short: "q",
-        long: "quiet",
-        takes_value: &false,
-        help: "Quiet",
-    };
-
-    let init_command = SonarCommand {
-        name: "init",
-        about: "Inits a new project in the current directory",
-    };
-
-    let init_command_complete_arg = SonarArg {
-        name: "complete",
-        short: "c",
-        long: "complete",
-        takes_value: &false,
-        help: "Output a config with all available settings",
-    };
-
-    let init_command_from_arg = SonarArg {
-        name: "file",
-        short: "f",
-        long: "file",
-        takes_value: &true,
-        help: "Creates a config from a file with a url for each line",
-    };
-
-    let init_command_overwrite_from_arg = SonarArg {
-        name: "overwrite",
-        short: "o",
-        long: "overwrite",
-        takes_value: &true,
-        help: "Overwrites any existing config file",
-    };
-
-    let run_command = SonarCommand {
-        name: "run",
-        about: "runs the project",
-    };
-
-    let app = App::new(sonar.name)
-        .arg(debug_arg.into_clap())
-        .arg(quiet_arg.into_clap())
-        .version(sonar.version)
-        .author(sonar.author)
-        .about(sonar.about)
-        .subcommand(
-            init_command
-                .into_clap()
-                .arg(init_command_complete_arg.into_clap())
-                .arg(init_command_from_arg.into_clap())
-                .arg(init_command_overwrite_from_arg.into_clap()),
+    let app = App::new(cli::APP_NAME)
+        .arg(
+            Arg::with_name(cli::DEBUG_ARG_NAME)
+                .help(cli::DEBUG_ARG_HELP)
+                .short(cli::DEBUG_ARG_SHORT)
+                .long(cli::DEBUG_ARG_LONG)
+                .takes_value(cli::DEBUG_ARG_TAKES_VALUE),
         )
-        .subcommand(
-            run_command
-                .into_clap()
-                .arg(run_command_threads_arg.into_clap())
-                .arg(run_command_config_arg.into_clap()),
+        .arg(
+            Arg::with_name(cli::QUIET_ARG_NAME)
+                .help(cli::QUIET_ARG_HELP)
+                .short(cli::QUIET_ARG_SHORT)
+                .long(cli::QUIET_ARG_LONG)
+                .takes_value(cli::QUIET_ARG_TAKES_VALUE),
         )
+        .version(cli::APP_VERSION)
+        .author(cli::APP_AUTHOR)
+        .about(cli::APP_ABOUT)
         .subcommand(
-            SubCommand::with_name("autocomplete")
-                .about("Generates completion scripts for your shell")
+            SubCommand::with_name(command::init::NAME)
+                .about(command::init::ABOUT)
                 .arg(
-                    Arg::with_name("SHELL")
-                        .required(true)
-                        .possible_values(&["bash", "fish", "zsh"])
-                        .help("The shell to generate the script for"),
+                    Arg::with_name(command::init::MAXIMUM_ARG_NAME)
+                        .help(command::init::MAXIMUM_ARG_HELP)
+                        .short(command::init::MAXIMUM_ARG_SHORT)
+                        .long(command::init::MAXIMUM_ARG_LONG)
+                        .takes_value(command::init::MAXIMUM_ARG_TAKES_VALUE),
+                )
+                .arg(
+                    Arg::with_name(command::init::FROM_ARG_NAME)
+                        .help(command::init::FROM_ARG_HELP)
+                        .short(command::init::FROM_ARG_SHORT)
+                        .long(command::init::FROM_ARG_LONG)
+                        .takes_value(command::init::FROM_ARG_TAKES_VALUE),
+                )
+                .arg(
+                    Arg::with_name(command::init::OVERWRITE_ARG_NAME)
+                        .help(command::init::OVERWRITE_ARG_HELP)
+                        .short(command::init::OVERWRITE_ARG_SHORT)
+                        .long(command::init::OVERWRITE_ARG_LONG)
+                        .takes_value(command::init::OVERWRITE_ARG_TAKES_VALUE),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name(command::run::NAME)
+                .about(command::run::ABOUT)
+                .arg(
+                    Arg::with_name(command::run::CONFIG_ARG_NAME)
+                        .help(command::run::CONFIG_ARG_HELP)
+                        .short(command::run::CONFIG_ARG_SHORT)
+                        .long(command::run::CONFIG_ARG_LONG)
+                        .takes_value(command::run::CONFIG_ARG_TAKES_VALUE),
+                )
+                .arg(
+                    Arg::with_name(command::run::THREAD_ARG_NAME)
+                        .help(command::run::THREAD_ARG_HELP)
+                        .short(command::run::THREAD_ARG_SHORT)
+                        .long(command::run::THREAD_ARG_LONG)
+                        .takes_value(command::run::THREAD_ARG_TAKES_VALUE),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name(command::autocomplete::NAME)
+                .about(command::autocomplete::ABOUT)
+                .arg(
+                    Arg::with_name(command::autocomplete::SHELL_ARG_NAME)
+                        .short(command::autocomplete::SHELL_ARG_SHORT)
+                        .long(command::autocomplete::SHELL_ARG_LONG)
+                        .required(command::autocomplete::SHELL_ARG_REQUIRED)
+                        .possible_values(&command::autocomplete::SHELL_POSSIBLE_VALUES)
+                        .help(command::autocomplete::SHELL_ARG_HELP),
                 ),
         );
 
@@ -173,7 +107,7 @@ fn main() {
     let matches = app.get_matches();
 
     // config debug
-    let is_debug = matches.is_present(debug_arg.name);
+    let is_debug = matches.is_present(cli::DEBUG_ARG_NAME);
     if is_debug {
         std::env::set_var("RUST_BACKTRACE", "full");
     }
@@ -186,7 +120,7 @@ fn main() {
         .add_filter_ignore_str("reqwest")
         .add_filter_ignore_str("want")
         .build();
-    if !matches.is_present(quiet_arg.name) {
+    if !matches.is_present(cli::QUIET_ARG_NAME) {
         let filter: LevelFilter = if is_debug {
             LevelFilter::Trace
         } else {
@@ -201,10 +135,11 @@ fn main() {
 
     let _ = CombinedLogger::init(loggers).expect("failed to setup logger");
 
+    let mut runtime_builder = runtime::Builder::new();
     // run command
     match matches.subcommand() {
-        (name, Some(matches)) if name == init_command.name => {
-            let from_file = match matches.args.get(init_command_from_arg.name) {
+        (name, Some(matches)) if name == command::init::NAME => {
+            let from_file = match matches.args.get(command::run::NAME) {
                 Some(args) => Some(PathBuf::from(
                     args.vals[0]
                         .clone()
@@ -213,16 +148,34 @@ fn main() {
                 )),
                 None => None,
             };
-            let size = match matches.args.get(init_command_complete_arg.name) {
-                Some(_) => commands::init::Size::Maximal,
-                None => commands::init::Size::Minimal,
-            };
-            dispatch_init_command(from_file, size);
+            let size = matches
+                .args
+                .get(command::init::MAXIMUM_ARG_NAME)
+                .map(|_| command::init::Size::Maximal)
+                .unwrap_or(command::init::Size::Minimal);
+            let overwrite = matches
+                .args
+                .get(command::init::OVERWRITE_ARG_NAME)
+                .map(|_| true)
+                .unwrap_or(false);
+
+            runtime_builder
+                .build()
+                .expect("failed to create runtime")
+                .block_on(
+                    command::init::Command {
+                        config: command::init::Config {
+                            overwrite,
+                            size,
+                            from_file,
+                        },
+                    }
+                    .execute(),
+                );
         }
-        (name, Some(matches)) if name == run_command.name => {
+        (name, Some(matches)) if name == command::run::NAME => {
             // setup runtime
-            let mut runtime_builder = runtime::Builder::new();
-            let threads_arg_match = matches.args.get(run_command_threads_arg.name);
+            let threads_arg_match = matches.args.get(command::run::THREAD_ARG_NAME);
             if threads_arg_match.is_some() {
                 let v = threads_arg_match.unwrap();
                 let n: usize = v.vals[0]
@@ -235,7 +188,7 @@ fn main() {
                 debug!("Thread pool set to {}", n);
             }
 
-            let config_path = match matches.args.get(run_command_config_arg.name) {
+            let config_path = match matches.args.get(command::run::CONFIG_ARG_NAME) {
                 Some(arg) => PathBuf::from(
                     arg.vals[0]
                         .clone()
@@ -244,48 +197,25 @@ fn main() {
                 ),
                 None => DEFAULT_CONFIG_PATH.into(),
             };
-            dipatch_run_command(config_path, Client::new());
+            runtime_builder
+                .build()
+                .expect("failed to create runtime")
+                .block_on(command::run::Command::exercute(config_path, Client::new()))
+                .expect("failed to block on run super	");
         }
-        ("autocomplete", Some(sub_matches)) => {
+        (command::autocomplete::NAME, Some(sub_matches)) => {
             let shell: Shell = sub_matches
-                .value_of("SHELL")
-                .expect("unable to get value of SHELL")
+                .value_of(command::autocomplete::SHELL_ARG_NAME)
+                .expect("unable to get shell name")
                 .parse()
-                .expect("unable to match SHELL");
-            app_clone.gen_completions_to(APP_NAME, shell, &mut std::io::stdout());
+                .expect("unable to parse SHELL");
+            command::autocomplete::Command::execute(app_clone, shell);
         }
         (_, _) => {
             app_clone
                 .print_long_help()
-                .expect("Failed to print error message. Sorry.");
+                .expect("failed to print error message. Sorry.");
             println!("");
         }
     }
-}
-
-fn dispatch_init_command(from_file: Option<PathBuf>, size: commands::init::Size) {
-    let mut rt = Runtime::new().expect("failed to start default tokio runtime");
-    let command = commands::init::Command {
-        config: commands::init::Config {
-            force: false,
-            size,
-            from_file,
-        },
-    };
-    rt.block_on(command.execute());
-}
-
-fn dipatch_run_command(config_path: PathBuf, client: Client) {
-    // setup runtime
-    let mut runtime_builder = runtime::Builder::new();
-    let mut runtime = runtime_builder
-        .thread_name("sonar-pool")
-        .threaded_scheduler()
-        .enable_all()
-        .build()
-        .expect("Failed to build runtime");
-
-    runtime
-        .block_on(commands::run::Command::exercute(config_path, client))
-        .expect("failed to block on run command");
 }

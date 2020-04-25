@@ -3,13 +3,34 @@ use log::*;
 use std::path::{Path, PathBuf};
 use tokio::{fs::read_to_string, prelude::*};
 
+pub const NAME: &str = "init";
+pub const ABOUT: &str = "creates a config file";
+
+pub const MAXIMUM_ARG_NAME: &str = "maximum";
+pub const MAXIMUM_ARG_SHORT: &str = "m";
+pub const MAXIMUM_ARG_LONG: &str = "maximum";
+pub const MAXIMUM_ARG_TAKES_VALUE: bool = false;
+pub const MAXIMUM_ARG_HELP: &str = "Adds all possible config values";
+
+pub const FROM_ARG_NAME: &str = "file";
+pub const FROM_ARG_SHORT: &str = "f";
+pub const FROM_ARG_LONG: &str = "file";
+pub const FROM_ARG_TAKES_VALUE: bool = false;
+pub const FROM_ARG_HELP: &str = "Creates a config from a file that has a url on each line";
+
+pub const OVERWRITE_ARG_NAME: &str = "overwrite";
+pub const OVERWRITE_ARG_SHORT: &str = "o";
+pub const OVERWRITE_ARG_LONG: &str = "overwrite";
+pub const OVERWRITE_ARG_TAKES_VALUE: bool = false;
+pub const OVERWRITE_ARG_HELP: &str = "Overwrite existing config file";
+
 pub enum Size {
     Minimal,
     Maximal,
 }
 
 pub struct Config {
-    pub force: bool,
+    pub overwrite: bool,
     pub size: Size,
     pub from_file: Option<PathBuf>,
 }
@@ -38,7 +59,7 @@ impl Command {
         match config {
             Ok(c) => {
                 let config = serde_yaml::to_string(&c).expect("invalid yaml");
-                if self.config_exists().await && !self.config.force {
+                if self.config_exists().await && !self.config.overwrite {
                     error!("config already exists. Aborting");
                     return;
                 }

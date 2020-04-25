@@ -21,6 +21,21 @@ use tokio::{
     time::delay_for,
 };
 
+pub const NAME: &str = "init";
+pub const ABOUT: &str = "creates a config file";
+
+pub const CONFIG_ARG_NAME: &str = "config";
+pub const CONFIG_ARG_SHORT: &str = "c";
+pub const CONFIG_ARG_LONG: &str = "config";
+pub const CONFIG_ARG_TAKES_VALUE: bool = true;
+pub const CONFIG_ARG_HELP: &str = "Path to config file";
+
+pub const THREAD_ARG_NAME: &str = "threads";
+pub const THREAD_ARG_SHORT: &str = "t";
+pub const THREAD_ARG_LONG: &str = "threads";
+pub const THREAD_ARG_TAKES_VALUE: bool = true;
+pub const THREAD_ARG_HELP: &str = "Max number of threads. Default to cores available";
+
 pub struct Command {
     http_client: Client,
     server_kill_sender: Option<oneshot::Sender<()>>,
