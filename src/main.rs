@@ -19,7 +19,7 @@ mod server;
 mod tasks;
 mod utils;
 
-use clap::{App, Arg, Shell, SubCommand};
+use clap::{App, Arg, ArgMatches, Shell, SubCommand};
 use log::*;
 use reqwest::Client;
 use simplelog::*;
@@ -29,114 +29,13 @@ use tokio::runtime;
 const DEFAULT_CONFIG_PATH: &str = "./sonar.yaml";
 
 fn main() {
-    let app = App::new(cli::APP_NAME)
-        .arg(
-            Arg::with_name(cli::DEBUG_ARG_NAME)
-                .help(cli::DEBUG_ARG_HELP)
-                .short(cli::DEBUG_ARG_SHORT)
-                .long(cli::DEBUG_ARG_LONG)
-                .takes_value(cli::DEBUG_ARG_TAKES_VALUE),
-        )
-        .arg(
-            Arg::with_name(cli::QUIET_ARG_NAME)
-                .help(cli::QUIET_ARG_HELP)
-                .short(cli::QUIET_ARG_SHORT)
-                .long(cli::QUIET_ARG_LONG)
-                .takes_value(cli::QUIET_ARG_TAKES_VALUE),
-        )
-        .version(cli::APP_VERSION)
-        .author(cli::APP_AUTHOR)
-        .about(cli::APP_ABOUT)
-        .subcommand(
-            SubCommand::with_name(command::init::NAME)
-                .about(command::init::ABOUT)
-                .arg(
-                    Arg::with_name(command::init::MAXIMUM_ARG_NAME)
-                        .help(command::init::MAXIMUM_ARG_HELP)
-                        .short(command::init::MAXIMUM_ARG_SHORT)
-                        .long(command::init::MAXIMUM_ARG_LONG)
-                        .takes_value(command::init::MAXIMUM_ARG_TAKES_VALUE),
-                )
-                .arg(
-                    Arg::with_name(command::init::FROM_ARG_NAME)
-                        .help(command::init::FROM_ARG_HELP)
-                        .short(command::init::FROM_ARG_SHORT)
-                        .long(command::init::FROM_ARG_LONG)
-                        .takes_value(command::init::FROM_ARG_TAKES_VALUE),
-                )
-                .arg(
-                    Arg::with_name(command::init::OVERWRITE_ARG_NAME)
-                        .help(command::init::OVERWRITE_ARG_HELP)
-                        .short(command::init::OVERWRITE_ARG_SHORT)
-                        .long(command::init::OVERWRITE_ARG_LONG)
-                        .takes_value(command::init::OVERWRITE_ARG_TAKES_VALUE),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name(command::run::NAME)
-                .about(command::run::ABOUT)
-                .arg(
-                    Arg::with_name(command::run::CONFIG_ARG_NAME)
-                        .help(command::run::CONFIG_ARG_HELP)
-                        .short(command::run::CONFIG_ARG_SHORT)
-                        .long(command::run::CONFIG_ARG_LONG)
-                        .takes_value(command::run::CONFIG_ARG_TAKES_VALUE),
-                )
-                .arg(
-                    Arg::with_name(command::run::THREAD_ARG_NAME)
-                        .help(command::run::THREAD_ARG_HELP)
-                        .short(command::run::THREAD_ARG_SHORT)
-                        .long(command::run::THREAD_ARG_LONG)
-                        .takes_value(command::run::THREAD_ARG_TAKES_VALUE),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name(command::autocomplete::NAME)
-                .about(command::autocomplete::ABOUT)
-                .arg(
-                    Arg::with_name(command::autocomplete::SHELL_ARG_NAME)
-                        .short(command::autocomplete::SHELL_ARG_SHORT)
-                        .long(command::autocomplete::SHELL_ARG_LONG)
-                        .required(command::autocomplete::SHELL_ARG_REQUIRED)
-                        .possible_values(&command::autocomplete::SHELL_POSSIBLE_VALUES)
-                        .help(command::autocomplete::SHELL_ARG_HELP),
-                ),
-        );
+    let mut app = create_cli();
+    let matches = app.clone().get_matches();
 
-    let mut app_clone = app.clone();
-    let matches = app.get_matches();
-
-    // config debug
-    let is_debug = matches.is_present(cli::DEBUG_ARG_NAME);
-    if is_debug {
-        std::env::set_var("RUST_BACKTRACE", "full");
-    }
-
-    // setup logger
-    let mut loggers: Vec<Box<dyn SharedLogger>> = vec![];
-    let config = ConfigBuilder::new()
-        .add_filter_ignore_str("mio")
-        .add_filter_ignore_str("hyper")
-        .add_filter_ignore_str("reqwest")
-        .add_filter_ignore_str("want")
-        .build();
-    if !matches.is_present(cli::QUIET_ARG_NAME) {
-        let filter: LevelFilter = if is_debug {
-            LevelFilter::Trace
-        } else {
-            LevelFilter::Info
-        };
-
-        match TermLogger::new(filter, config.clone(), TerminalMode::Mixed) {
-            Some(logger) => loggers.push(logger),
-            None => loggers.push(SimpleLogger::new(filter, config.clone())),
-        }
-    }
-
-    let _ = CombinedLogger::init(loggers).expect("failed to setup logger");
+    setup_backtrace_if_debug(&matches);
+    setup_logger(&matches);
 
     let mut runtime_builder = runtime::Builder::new();
-    // run command
     match matches.subcommand() {
         (name, Some(matches)) if name == command::init::NAME => {
             let from_file = match matches.args.get(command::run::NAME) {
@@ -209,13 +108,118 @@ fn main() {
                 .expect("unable to get shell name")
                 .parse()
                 .expect("unable to parse SHELL");
-            command::autocomplete::Command::execute(app_clone, shell);
+            command::autocomplete::Command::execute(app, shell);
         }
         (_, _) => {
-            app_clone
-                .print_long_help()
+            app.print_long_help()
                 .expect("failed to print error message. Sorry.");
             println!("");
         }
     }
+}
+
+fn create_cli<'a, 'b>() -> App<'a, 'b> {
+    App::new(cli::APP_NAME)
+        .arg(
+            Arg::with_name(cli::DEBUG_ARG_NAME)
+                .help(cli::DEBUG_ARG_HELP)
+                .short(cli::DEBUG_ARG_SHORT)
+                .long(cli::DEBUG_ARG_LONG)
+                .takes_value(cli::DEBUG_ARG_TAKES_VALUE),
+        )
+        .arg(
+            Arg::with_name(cli::QUIET_ARG_NAME)
+                .help(cli::QUIET_ARG_HELP)
+                .short(cli::QUIET_ARG_SHORT)
+                .long(cli::QUIET_ARG_LONG)
+                .takes_value(cli::QUIET_ARG_TAKES_VALUE),
+        )
+        .version(cli::APP_VERSION)
+        .author(cli::APP_AUTHOR)
+        .about(cli::APP_ABOUT)
+        .subcommand(
+            SubCommand::with_name(command::init::NAME)
+                .about(command::init::ABOUT)
+                .arg(
+                    Arg::with_name(command::init::MAXIMUM_ARG_NAME)
+                        .help(command::init::MAXIMUM_ARG_HELP)
+                        .short(command::init::MAXIMUM_ARG_SHORT)
+                        .long(command::init::MAXIMUM_ARG_LONG)
+                        .takes_value(command::init::MAXIMUM_ARG_TAKES_VALUE),
+                )
+                .arg(
+                    Arg::with_name(command::init::FROM_ARG_NAME)
+                        .help(command::init::FROM_ARG_HELP)
+                        .short(command::init::FROM_ARG_SHORT)
+                        .long(command::init::FROM_ARG_LONG)
+                        .takes_value(command::init::FROM_ARG_TAKES_VALUE),
+                )
+                .arg(
+                    Arg::with_name(command::init::OVERWRITE_ARG_NAME)
+                        .help(command::init::OVERWRITE_ARG_HELP)
+                        .short(command::init::OVERWRITE_ARG_SHORT)
+                        .long(command::init::OVERWRITE_ARG_LONG)
+                        .takes_value(command::init::OVERWRITE_ARG_TAKES_VALUE),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name(command::run::NAME)
+                .about(command::run::ABOUT)
+                .arg(
+                    Arg::with_name(command::run::CONFIG_ARG_NAME)
+                        .help(command::run::CONFIG_ARG_HELP)
+                        .short(command::run::CONFIG_ARG_SHORT)
+                        .long(command::run::CONFIG_ARG_LONG)
+                        .takes_value(command::run::CONFIG_ARG_TAKES_VALUE),
+                )
+                .arg(
+                    Arg::with_name(command::run::THREAD_ARG_NAME)
+                        .help(command::run::THREAD_ARG_HELP)
+                        .short(command::run::THREAD_ARG_SHORT)
+                        .long(command::run::THREAD_ARG_LONG)
+                        .takes_value(command::run::THREAD_ARG_TAKES_VALUE),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name(command::autocomplete::NAME)
+                .about(command::autocomplete::ABOUT)
+                .arg(
+                    Arg::with_name(command::autocomplete::SHELL_ARG_NAME)
+                        .short(command::autocomplete::SHELL_ARG_SHORT)
+                        .long(command::autocomplete::SHELL_ARG_LONG)
+                        .required(command::autocomplete::SHELL_ARG_REQUIRED)
+                        .possible_values(&command::autocomplete::SHELL_POSSIBLE_VALUES)
+                        .help(command::autocomplete::SHELL_ARG_HELP),
+                ),
+        )
+}
+
+fn setup_backtrace_if_debug(matches: &ArgMatches) {
+    if matches.is_present(cli::DEBUG_ARG_NAME) {
+        std::env::set_var("RUST_BACKTRACE", "full");
+    }
+}
+
+fn setup_logger(matches: &ArgMatches) {
+    let mut loggers: Vec<Box<dyn SharedLogger>> = vec![];
+    let config = ConfigBuilder::new()
+        .add_filter_ignore_str("mio")
+        .add_filter_ignore_str("hyper")
+        .add_filter_ignore_str("reqwest")
+        .add_filter_ignore_str("want")
+        .build();
+    if !matches.is_present(cli::QUIET_ARG_NAME) {
+        let filter: LevelFilter = if matches.is_present(cli::DEBUG_ARG_NAME) {
+            LevelFilter::Trace
+        } else {
+            LevelFilter::Info
+        };
+
+        match TermLogger::new(filter, config.clone(), TerminalMode::Mixed) {
+            Some(logger) => loggers.push(logger),
+            None => loggers.push(SimpleLogger::new(filter, config.clone())),
+        }
+    }
+
+    let _ = CombinedLogger::init(loggers).expect("failed to setup logger");
 }
