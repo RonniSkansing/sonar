@@ -21,8 +21,8 @@ use tokio::{
     time::delay_for,
 };
 
-pub const NAME: &str = "init";
-pub const ABOUT: &str = "creates a config file";
+pub const NAME: &str = "run";
+pub const ABOUT: &str = "starts the requesting";
 
 pub const CONFIG_ARG_NAME: &str = "config";
 pub const CONFIG_ARG_SHORT: &str = "c";
@@ -48,26 +48,22 @@ pub struct Command {
 
 impl Command {
     pub async fn exercute<'a>(config_path: PathBuf, client: Client) -> Result<(), Box<dyn Error>> {
-        let (abs_path_to_config_file, abs_path_to_config_folder) =
-            to_absolute_pair(config_path.clone()).await;
+        let (abs_config_file, abs_config_folder) = to_absolute_pair(config_path.clone()).await;
 
         let (tx, rx) = std::sync::mpsc::channel::<DebouncedEvent>();
         let mut config_watcher = watcher(tx, std::time::Duration::from_millis(100))
             .expect("failed to create config watcher");
 
         config_watcher
-            .watch(
-                abs_path_to_config_folder.clone(),
-                RecursiveMode::NonRecursive,
-            )
+            .watch(abs_config_folder.clone(), RecursiveMode::NonRecursive)
             .expect("failed to watch config root folder");
 
         // handle initial start run
         let mut executor = Command::new(client);
-        executor.handle(abs_path_to_config_file.clone()).await;
+        executor.handle(abs_config_file.clone()).await;
         debug!(
             "watching for config changes in {}",
-            abs_path_to_config_folder
+            abs_config_folder
                 .to_str()
                 .expect("failed to stringify abs config folder path")
         );
@@ -77,13 +73,13 @@ impl Command {
             match rx.recv() {
                 Ok(event) => match event {
                     DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
-                        if !path.eq(&abs_path_to_config_file) {
+                        if !path.eq(&abs_config_file) {
                             continue;
                         }
-                        executor.handle(abs_path_to_config_file.clone()).await;
+                        executor.handle(abs_config_file.clone()).await;
                     }
                     DebouncedEvent::Remove(path) => {
-                        if !path.eq(&abs_path_to_config_file) {
+                        if !path.eq(&abs_config_file) {
                             executor.stop_all().await;
                             continue;
                         }

@@ -84,9 +84,9 @@ fn main() {
                     .parse()
                     .expect("failed to parse thread number to usize");
                 runtime_builder.max_threads(n);
+
                 debug!("Thread pool set to {}", n);
             }
-
             let config_path = match matches.args.get(command::run::CONFIG_ARG_NAME) {
                 Some(arg) => PathBuf::from(
                     arg.vals[0]
@@ -97,10 +97,13 @@ fn main() {
                 None => DEFAULT_CONFIG_PATH.into(),
             };
             runtime_builder
+                .threaded_scheduler()
+                .thread_name(cli::APP_NAME)
+                .enable_all()
                 .build()
                 .expect("failed to create runtime")
                 .block_on(command::run::Command::exercute(config_path, Client::new()))
-                .expect("failed to block on run super	");
+                .expect("failed run 'run' command");
         }
         (command::autocomplete::NAME, Some(sub_matches)) => {
             let shell: Shell = sub_matches
