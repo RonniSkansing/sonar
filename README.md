@@ -15,9 +15,12 @@
 
 * TODO
 
-- Implement webhooks for success / failure
+DOING - Implement webhooks for success / failure
+DOING - Refactor config to use builder pattern, perhaps also check out &str usage possible
+
 - Implement rest endpoint for reading log
 - Implement a single target mode
+- Implement counters for total request in process
 - Implement a cluster master / slave node mode
 - Improve error messages / maybe change to a tracing lib
 - Refactor

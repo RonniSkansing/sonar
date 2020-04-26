@@ -204,6 +204,11 @@ impl Command {
                     abort_registration,
                 ));
             }
+            // web hooks
+            if target.web_hook.is_some() {
+                let url = target.clone_unwrap_web_hook();
+            }
+
             // requesters
             let requester = IntervalRequesterTask::new(self.http_client.clone(), broadcast_tx);
             let (abort_handle, abort_registration) = AbortHandle::new_pair();

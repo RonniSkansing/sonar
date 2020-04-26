@@ -69,6 +69,9 @@ pub struct Target {
     pub log: Option<LogFile>,
     #[serde(default = "factory::none", skip_serializing_if = "Option::is_none")]
     pub prometheus_response_time_bucket: Option<Vec<f64>>,
+
+    #[serde(default = "factory::none", skip_serializing_if = "Option::is_none")]
+    pub web_hook: Option<String>,
 }
 
 impl Target {
@@ -112,6 +115,7 @@ impl Target {
             max_concurrent: self.max_concurrent,
             prometheus_response_time_bucket: self.prometheus_response_time_bucket,
             log: self.log,
+            web_hook: self.web_hook,
         }
     }
 
@@ -133,6 +137,10 @@ impl Target {
 
     pub fn clone_unwrap_log(&self) -> LogFile {
         self.log.clone().expect("failed to get log")
+    }
+
+    pub fn clone_unwrap_web_hook(&self) -> String {
+        self.web_hook.clone().expect("failed to get web hook")
     }
 }
 
@@ -199,6 +207,34 @@ impl TargetDefault {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct WebHook {
+    url: String,
+    #[serde(
+        default = "WebHook::some_default_timeout",
+        skip_serializing_if = "Option::is_none"
+    )]
+    timeout: Option<DurationString>,
+}
+
+impl WebHook {
+    pub fn some_default_timeout() -> Option<DurationString> {
+        Some(DurationString::from_string("3s".to_string()).unwrap())
+    }
+
+    pub fn new<T: Into<String>>(url: T) -> Self {
+        Self {
+            url: url.into(),
+            timeout: None,
+        }
+    }
+
+    pub fn set_timeout(&mut self, d: Option<DurationString>) -> &mut Self {
+        self.timeout = d;
+        self
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub server: Option<ServerConfig>,
@@ -223,6 +259,7 @@ impl Config {
                 timeout: None,
                 log: None,
                 prometheus_response_time_bucket: None,
+                web_hook: None,
             }
             .hydrate()],
         }
@@ -256,6 +293,7 @@ impl Config {
                 max_concurrent: Some(DEFAULT_MAX_CONCURRENT),
                 log: Some(log),
                 prometheus_response_time_bucket: Some(vec![100.0, 250.0, 500.0, 1000.0]),
+                web_hook: Some("http://localhost:12345".to_string()),
             }],
         }
     }
@@ -275,6 +313,7 @@ impl Config {
                     timeout: None,
                     log: None,
                     prometheus_response_time_bucket: None,
+                    web_hook: None,
                 }
                 .hydrate()
             })
@@ -319,6 +358,7 @@ impl Config {
                     timeout: Some(timeout),
                     log: Some(log),
                     prometheus_response_time_bucket: Some(vec![100.0, 250.0, 500.0, 1000.0]),
+                    web_hook: Some("https://localhost:12345".to_string()),
                 }
                 .hydrate()
             })
