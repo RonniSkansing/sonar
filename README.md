@@ -15,7 +15,6 @@
 
 * TODO
 
-- Hook up an global abort handler on any panic
 - Implement webhooks for success / failure
 - Implement rest endpoint for reading log
 - Implement a single target mode

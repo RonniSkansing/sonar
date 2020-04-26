@@ -34,6 +34,7 @@ fn main() {
 
     setup_backtrace_if_debug(&matches);
     setup_logger(&matches);
+    setup_panic_handler();
 
     let mut runtime_builder = runtime::Builder::new();
     match matches.subcommand() {
@@ -58,19 +59,18 @@ fn main() {
                 .map(|_| true)
                 .unwrap_or(false);
 
-            runtime_builder
-                .build()
-                .expect("failed to create runtime")
-                .block_on(
-                    command::init::Command {
-                        config: command::init::Config {
-                            overwrite,
-                            size,
-                            from_file,
-                        },
-                    }
-                    .execute(),
-                );
+            let mut rt = runtime_builder.build().expect("failed to create runtime");
+
+            rt.block_on(
+                command::init::Command {
+                    config: command::init::Config {
+                        overwrite,
+                        size,
+                        from_file,
+                    },
+                }
+                .execute(),
+            );
         }
         (name, Some(matches)) if name == command::run::NAME => {
             // setup runtime
@@ -225,4 +225,13 @@ fn setup_logger(matches: &ArgMatches) {
     }
 
     let _ = CombinedLogger::init(loggers).expect("failed to setup logger");
+}
+
+fn setup_panic_handler() {
+    let hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |p| {
+        hook(p);
+        error!("a thread panicked - shutting down");
+        std::process::exit(1);
+    }));
 }
